@@ -24,7 +24,6 @@
             <p class="text-sm text-slate-400 mt-3">Password is stored locally in your browser. The chosen password for this build: <strong>2025</strong></p>
         </div>
 
-        <!-- Admin Panel (hidden until logged in) -->
         <div id="adminPanel" class="hidden max-w-3xl mx-auto mt-8 bg-slate-800 p-6 rounded-xl shadow-2xl">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-indigo-400">Admin Controls</h2>
@@ -33,7 +32,6 @@
                 </div>
             </div>
 
-            <!-- Stats -->
             <div class="mb-6 border-b border-slate-700 pb-4">
                 <h3 class="text-lg font-semibold text-slate-100">Hub Statistics</h3>
                 <div id="statsSummary" class="text-slate-300 mb-3 text-sm">Loading stats...</div>
@@ -43,47 +41,65 @@
                 </div>
             </div>
 
-            <!-- Game management -->
             <div class="mb-6">
                 <label class="block text-sm text-slate-300 mb-2">Edit existing game</label>
                 <select id="editGameSelector" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-4">
                     <option value="">-- Add New Game --</option>
                 </select>
 
-                <label class="block text-sm text-slate-300 mb-1">Game ID</label>
+                <label class="block text-sm text-slate-300 mb-1">Game ID (a-z, 0-9, -)</label>
                 <input id="gameIdInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
 
                 <label class="block text-sm text-slate-300 mb-1">Game Name</label>
                 <input id="gameNameInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
 
-                <label class="block text-sm text-slate-300 mb-1">Game Link (optional)</label>
+                <label class="block text-sm text-slate-300 mb-1">Game Link (URL)</label>
                 <input id="gameLinkInput" type="url" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
 
+                <label class="block text-sm text-slate-300 mb-1">Thumbnail Path (e.g., assets/game.png)</label>
+                <input id="gameImageInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
+
+                <label class="block text-sm text-slate-300 mb-1">Category (e.g., Shooter, Puzzle)</label>
+                <input id="gameCategoryInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
                 <div class="flex items-center mb-3">
                     <input id="gameVisibleInput" type="checkbox" class="h-4 w-4 text-indigo-600 bg-slate-700 border-slate-600 rounded">
                     <label for="gameVisibleInput" class="ml-2 text-slate-300">Visible to users</label>
                 </div>
 
-                <div id="adminMessage" class="text-sm text-yellow-400 mb-3"></div>
+                <div id="adminMessage" class="text-sm text-yellow-400 mb-3">Creating a new game.</div>
 
                 <div class="flex space-x-4">
                     <button id="saveGameBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg w-full">Save Game</button>
+                    <button id="testGameBtn" class="px-4 py-3 bg-yellow-600 text-white rounded-lg w-full">Test Game</button>
                     <button id="deleteGameBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg w-full">Delete Selected</button>
                 </div>
             </div>
 
             <div>
-                <h3 class="text-lg font-semibold text-slate-100 mb-2">Recent Clicks</h3>
+                <h3 class="text-lg font-semibold text-slate-100 mb-2">Recent Clicks & Errors</h3>
                 <div id="recentClicks" class="bg-slate-900 p-3 rounded-lg text-slate-300 max-h-48 overflow-y-auto"></div>
             </div>
         </div>
 
     </div>
 
+    <div id="gameModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center p-4">
+        <div class="relative w-full h-full max-w-7xl max-h-5xl">
+            <button id="closeGameBtn" class="absolute top-0 right-0 m-4 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 z-50 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <iframe id="gameIframe" src="" class="w-full h-full border-0 rounded-xl" allowfullscreen></iframe>
+        </div>
+    </div>
+
+
     <script src="script.js"></script>
     <script>
         // Admin page wiring
         document.getElementById('backBtn').onclick = () => { window.location.href = 'index.html'; };
+        document.getElementById('closeGameBtn').onclick = () => { closeGame(); }; // Close modal function from script.js
 
         document.getElementById('adminLoginBtn').onclick = () => {
             const pw = document.getElementById('adminPassword').value;
@@ -114,18 +130,28 @@
             alert('Stats reset');
         };
 
+        // NEW: Test Game Button
+        document.getElementById('testGameBtn').onclick = () => {
+            const link = document.getElementById('gameLinkInput').value.trim();
+            if (!link) { alert('Game Link is required to test.'); return; }
+            launchGame('Test Game', link, true); // Launch with isTest=true
+        };
+
+
         // Save / Delete logic
         document.getElementById('saveGameBtn').onclick = () => {
-            const idEl = document.getElementById('gameIdInput');
-            const id = idEl.value.trim();
+            const id = document.getElementById('gameIdInput').value.trim();
             const name = document.getElementById('gameNameInput').value.trim();
             const link = document.getElementById('gameLinkInput').value.trim();
             const visible = document.getElementById('gameVisibleInput').checked;
+            const image = document.getElementById('gameImageInput').value.trim(); // NEW
+            const category = document.getElementById('gameCategoryInput').value.trim(); // NEW
 
             if (!id || !name) { alert('ID and Name required'); return; }
             if (!/^[a-z0-9-]+$/.test(id)) { alert('ID must be lowercase letters, numbers, or hyphens'); return; }
 
-            upsertGame({ id, name, link, visible });
+            // NEW: Add image and category to the game object
+            upsertGame({ id, name, link, visible, image, category });
             renderAdminOptions();
             renderGameList();
             alert('Saved');
@@ -154,13 +180,8 @@
             // hook selector change behavior (works because script.js sets change handler)
             document.getElementById('editGameSelector').onchange = (e) => {
                 const id = e.target.value;
-                if (id && getGamesObj()[id]) {
-                    const g = getGamesObj()[id];
-                    document.getElementById('gameIdInput').value = g.id;
-                    document.getElementById('gameNameInput').value = g.name;
-                    document.getElementById('gameLinkInput').value = g.link || '';
-                    document.getElementById('gameVisibleInput').checked = g.visible !== false;
-                    document.getElementById('adminMessage').textContent = 'Editing existing game.';
+                if (id) {
+                    loadGameToForm(id);
                 } else {
                     clearGameForm();
                 }
