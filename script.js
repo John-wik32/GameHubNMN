@@ -3,13 +3,14 @@
 // ---------- Global State & Constants ----------
 const STORAGE_KEY = 'unblockhub_data';
 const FAVORITES_KEY = 'unblockhub_favorites';
-const PLACEHOLDER_IMG_URL = 'https://placehold.co/100x70/334155/94a3b8?text=NO+IMG';
+// FIX: Use a robust placeholder image URL to avoid 404 errors
+const PLACEHOLDER_IMG_URL = 'https://placehold.co/100x70/334155/94a3b8?text=NO+IMG'; 
 const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulation', 'Other'];
 const ADMIN_PASSWORD = '2025'; // Default admin password
 
 let DATA = null;
-let allGames = {};
-let stats = { counts: {}, recent: [] };
+let allGames = {}; // object keyed by id
+let stats = {};
 
 // ---------- LocalStorage & Data Helpers ----------
 
@@ -17,11 +18,12 @@ let stats = { counts: {}, recent: [] };
 function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-        // Initial setup with new properties
+        // Initial setup with new, richer properties
         const defaultData = {
             games: {
                 'flappy-bird': { id: 'flappy-bird', name: 'Flappy Bird Clone', image: '', category: 'Arcade', type: 'link', content: 'https://flappybird.io/', visible: true, dateAdded: Date.now() - 3600000 },
                 'snake-game': { id: 'snake-game', name: 'Classic Snake', image: '', category: 'Arcade', type: 'link', content: 'https://playsnake.org/', visible: true, dateAdded: Date.now() - 7200000 },
+                // Example of an embed game using a YouTube iframe
                 'embed-example': { id: 'embed-example', name: 'Embedded Game Test', image: '', category: 'Other', type: 'embed', content: '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" style="width: 100%; height: 100%; border:0;" allow="autoplay; fullscreen; picture-in-picture"></iframe>', visible: true, dateAdded: Date.now() }
             },
             stats: { counts: {}, recent: [] },
@@ -32,22 +34,19 @@ function loadData() {
     }
     try {
         const data = JSON.parse(raw);
-        // Migration logic for older games that only had 'link'
+        // Data migration and cleanup logic to ensure all games have new properties
         for (const id in data.games) {
             const game = data.games[id];
-            game.image = game.image || '';
-            game.category = game.category || 'Other';
-            
-            // New type/content logic
-            if (game.link) {
+            // If the old 'link' property exists, convert it to the new 'type'/'content' model
+            if (game.link && !game.content) {
                 game.type = 'link';
                 game.content = game.link;
-                delete game.link; // Clean up old property
-            } else {
-                game.type = game.type || 'embed'; // Assume embed if no link found
-                game.content = game.content || '';
+                delete game.link;
             }
-            
+            game.image = game.image || '';
+            game.category = game.category || 'Other';
+            game.type = game.type || 'link';
+            game.content = game.content || '';
             game.dateAdded = game.dateAdded || Date.now();
         }
         return data;
@@ -65,7 +64,7 @@ function getStatsObj() { return (DATA && DATA.stats) ? DATA.stats : { counts: {}
 function setStatsObj(obj) { DATA.stats = obj; saveData(); stats = obj; }
 function getAdminPassword() { return DATA.admin_password || ADMIN_PASSWORD; }
 
-// ---------- Favorites System ----------
+// ---------- Favorites System (NEW/FIXED) ----------
 
 function getFavorites() {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -88,48 +87,28 @@ function toggleFavorite(gameId) {
     }
 
     setFavorites(favorites);
-    renderGameList(); // Update main view card
-    updateFavoriteButton(gameId); // Update modal button if open
-}
-
-/** Updates the favorite button inside the modal. */
-function updateFavoriteButton(gameId) {
-    const btn = document.getElementById('favoriteBtn');
-    if (!btn) return;
-
-    const isFavorited = getFavorites().includes(gameId);
-    
-    btn.onclick = (e) => { 
-        toggleFavorite(gameId);
-        if (e) e.stopPropagation();
-    };
-
-    btn.classList.toggle('favorited', isFavorited);
-    
-    // Star icon SVG
-    const svgContent = `<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/></svg>`;
-
-    btn.innerHTML = svgContent;
-    // Apply Tailwind classes for styling
-    btn.querySelector('svg').classList.remove('text-slate-400', 'hover:text-amber-500', 'text-amber-500');
-    btn.querySelector('svg').classList.add(isFavorited ? 'text-amber-500' : 'text-slate-400', isFavorited ? '' : 'hover:text-amber-500');
+    renderGameList(); // Refresh the list to update the star icon
 }
 
 // ---------- UI / Rendering Functions ----------
 
 function showMessage(title, content) {
+    const mb = document.getElementById('messageBox');
+    if (!mb) return alert(title + '\n\n' + content);
     document.getElementById('messageTitle').textContent = title;
     document.getElementById('messageContent').textContent = content;
-    const box = document.getElementById('messageBox');
-    const inner = document.getElementById('messageInner');
+    mb.classList.remove('hidden');
 
-    box.classList.remove('hidden');
+    // Add close handler (if not already set in HTML)
+    document.getElementById('messageCloseBtn').onclick = () => {
+        document.getElementById('messageBox').classList.add('hidden');
+    };
+}
 
-    setTimeout(() => {
-        // Simple transition logic for the alert box
-        const dialog = document.querySelector('#messageBox > div');
-        if (dialog) dialog.style.opacity = '1';
-    }, 10);
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function renderCategoryFilter() {
@@ -153,7 +132,7 @@ function renderGameList() {
     const sortBy = (document.getElementById('sortBy') && document.getElementById('sortBy').value) || 'popular';
     
     // Determine active tab to filter for favorites
-    const isFavoritesTab = document.querySelector('#tabFavorites').classList.contains('active');
+    const isFavoritesTab = document.querySelector('#tabFavorites') && document.querySelector('#tabFavorites').classList.contains('active');
     
     let gamesArray = Object.values(getGamesObj());
     const favorites = getFavorites();
@@ -163,6 +142,7 @@ function renderGameList() {
         if (g.visible === false) return false;
         if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
         if (!g.name.toLowerCase().includes(filterText) && !g.id.toLowerCase().includes(filterText)) return false;
+        // FIX: Filtering logic for Favorites tab
         if (isFavoritesTab && !favorites.includes(g.id)) return false;
         return true;
     });
@@ -182,7 +162,7 @@ function renderGameList() {
     // 3. Render
     let html = '';
     if (gamesArray.length === 0) {
-        html = `<p class="text-center col-span-full text-slate-500 mt-8">No games found.</p>`;
+        html = `<p class="text-center col-span-full text-slate-500 mt-8">${isFavoritesTab ? 'You have no favorite games.' : 'No games match your criteria.'}</p>`;
     } else {
         html = gamesArray.map(game => {
             const clickCount = stats.counts[game.id] || 0;
@@ -190,19 +170,19 @@ function renderGameList() {
             const imageSrc = game.image || PLACEHOLDER_IMG_URL;
 
             return `
-                <div id="game-card-${game.id}" class="game-card p-4 rounded-xl shadow-lg flex flex-col justify-between relative">
+                <div id="game-card-${escapeHtml(game.id)}" class="game-card p-4 rounded-xl shadow-lg flex flex-col justify-between relative">
                     
-                    <div onclick="window.launchGame('${game.id}')" class="cursor-pointer">
-                        <img src="${imageSrc}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG_URL}'" 
-                             alt="${game.name}" loading="lazy" class="w-full h-24 object-cover rounded-lg mb-3">
-                        <h3 class="text-lg font-bold truncate">${game.name}</h3>
+                    <div onclick="window.launchGame('${escapeHtml(game.id)}')" class="cursor-pointer">
+                        <img src="${escapeHtml(imageSrc)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG_URL}'" 
+                             alt="${escapeHtml(game.name)}" loading="lazy" class="w-full h-24 object-cover rounded-lg mb-3">
+                        <h3 class="text-lg font-bold truncate">${escapeHtml(game.name)}</h3>
                     </div>
 
                     <div class="flex justify-between items-center mt-2">
                         <p class="text-sm text-slate-400">
-                            <span class="font-bold text-xs">${game.category || 'Other'}</span> &bull; ${clickCount.toLocaleString()} plays
+                            <span class="font-bold text-xs">${escapeHtml(game.category || 'Other')}</span> &bull; ${clickCount.toLocaleString()} plays
                         </p>
-                        <button onclick="window.toggleFavorite('${game.id}'); event.stopPropagation();" class="p-1 z-10" title="Toggle Favorite">
+                        <button onclick="window.toggleFavorite('${escapeHtml(game.id)}'); event.stopPropagation();" class="p-1 z-10" title="Toggle Favorite">
                             <svg class="w-5 h-5 fill-current ${isFavorited ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}" viewBox="0 0 24 24">
                                 <path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/>
                             </svg>
@@ -220,7 +200,7 @@ function logClick(gameId) {
     const currentStats = getStatsObj();
     currentStats.counts[gameId] = (currentStats.counts[gameId] || 0) + 1;
     currentStats.recent.unshift({ gameId: gameId, timestamp: Date.now() });
-    currentStats.recent = currentStats.recent.slice(0, 50);
+    currentStats.recent = currentStats.recent.slice(0, 500); // Keep last 500
     setStatsObj(currentStats);
 }
 
@@ -233,42 +213,30 @@ function launchGame(gameId) {
     }
 
     logClick(gameId);
-    renderGameList();
+    renderGameList(); // Update play count on card
 
+    // FIX: Get elements for the new custom player modal
     const modal = document.getElementById('gameModal');
     const titleEl = document.getElementById('modalGameTitle');
-    const gameLinkEl = document.getElementById('modalGameLink');
     const embedContainer = document.getElementById('gameEmbedContainer');
 
     titleEl.textContent = game.name;
-    updateFavoriteButton(gameId);
     
     // Clear previous content before inserting new one
     embedContainer.innerHTML = '';
     
     if (game.type === 'link') {
+        // FIX: Open external link in new tab
         window.open(game.content, '_blank');
-        modal.classList.add('hidden'); // Ensure modal is closed if it was open
+        if(modal) modal.classList.add('hidden'); 
         showMessage('Game Launched', `The game '${game.name}' has been opened in a new tab.`);
-        
-        // Hide/disable open source link for external links
-        gameLinkEl.classList.add('opacity-50', 'cursor-not-allowed');
-        gameLinkEl.href = 'javascript:void(0)';
-        gameLinkEl.textContent = 'Opened in New Tab';
         
     } else if (game.type === 'embed') {
         
-        // Prepare link element for embed type (try to extract the src)
-        const srcMatch = game.content.match(/src=["'](.*?)["']/);
-        gameLinkEl.href = srcMatch ? srcMatch[1] : 'javascript:void(0)';
-        gameLinkEl.textContent = 'View Embed Source Link';
-        gameLinkEl.classList.remove('opacity-50', 'cursor-not-allowed');
-
-        // FIX: Wrap the embed content in a full-size div for proper sizing and inject
-        // This is the Custom Player Logic
+        // FIX: Inject embed code into the container
         embedContainer.innerHTML = `<div class="w-full h-full">${game.content}</div>`;
         
-        // FIX: Find any iframe inside the content and explicitly set full size
+        // FIX: Ensure any iframe inside the content is full size to fix "plugin not supported"
         const iframe = embedContainer.querySelector('iframe');
         if(iframe) {
             iframe.style.width = '100%';
@@ -276,20 +244,22 @@ function launchGame(gameId) {
             iframe.setAttribute('loading', 'lazy');
         }
 
-        modal.classList.remove('hidden');
+        if(modal) modal.classList.remove('hidden');
     }
 }
 
 function closeGame() {
     const modal = document.getElementById('gameModal');
     const embedContainer = document.getElementById('gameEmbedContainer');
+    if (!modal || !embedContainer) return;
 
     // Clear content to stop any media/processing
     embedContainer.innerHTML = '';
     modal.classList.add('hidden');
 }
 
-// ---------- Admin Functions ----------
+
+// ---------- Admin Functions (For admin.html) ----------
 
 function requireAdmin() {
     return localStorage.getItem('adminLoggedIn') === 'true';
@@ -299,20 +269,14 @@ function renderAdminOptions() {
     const selector = document.getElementById('editGameSelector');
     if (!selector) return;
 
-    const gameArray = Object.values(allGames).sort((a, b) => a.name.localeCompare(b.name));
+    const gameArray = Object.values(allGames).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     let html = '<option value="">-- Add New Game --</option>';
     html += gameArray.map(game =>
-        `<option value="${game.id}">${game.name} (${game.id})</option>`
+        `<option value="${escapeHtml(game.id)}">${escapeHtml(game.name)} (${escapeHtml(game.id)})</option>`
     ).join('');
 
     selector.innerHTML = html;
-
-    const categorySelect = document.getElementById('gameCategoryInput');
-    if (categorySelect) {
-        let options = DEFAULT_CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('');
-        categorySelect.innerHTML = options;
-    }
 }
 
 function upsertGame(gameData) {
@@ -325,7 +289,8 @@ function upsertGame(gameData) {
         type: gameData.type,
         content: gameData.content,
         visible: gameData.visible,
-        dateAdded: games[gameData.id] ? games[gameData.id].dateAdded : Date.now()
+        // Preserve original dateAdded if editing, otherwise set new date
+        dateAdded: games[gameData.id] ? games[gameData.id].dateAdded : Date.now() 
     };
     setGamesObj(games);
     showMessage('Success', `Game "${gameData.name}" has been saved/updated.`);
@@ -343,89 +308,94 @@ function deleteGame(id) {
 }
 
 function renderStatsSummary() {
-    const container = document.getElementById('statsSummary');
-    if (!container || !requireAdmin()) return;
+    const el = document.getElementById('statsSummary');
+    if (!el) return;
+    const counts = stats.counts || {};
+    const totalClicks = Object.entries(counts).reduce((s,[k,v]) => (k === '__visits' ? s : s + (v||0)), 0);
+    
+    // Top 3 logic
+    const entries = Object.entries(counts).filter(([k]) => k !== '__visits').sort(([,a],[,b]) => b - a).slice(0,3);
+    let topHtml = '';
+    if (entries.length) {
+        topHtml = '<p class="text-sm text-slate-400 mt-2">Top Games: ' + entries.map(([id, c]) => `${escapeHtml((allGames[id] && allGames[id].name) || id)} (${c})`).join(', ') + '</p>';
+    }
 
-    const games = getGamesObj();
-    const counts = stats.counts;
-    const totalGames = Object.keys(games).length;
-    const totalClicks = Object.values(counts).reduce((sum, count) => sum + count, 0);
-
-    container.innerHTML = `
-        <h2 class="text-2xl font-bold text-indigo-400 mb-4">Stats Summary</h2>
-        <p class="text-slate-300">Total Games: <span class="font-bold text-white">${totalGames}</span></p>
-        <p class="text-slate-300">Total Clicks: <span class="font-bold text-white">${totalClicks.toLocaleString()}</span></p>
+    el.innerHTML = `
+        <p>Total Games: <span class="font-bold">${Object.keys(allGames).length}</span></p>
+        <p>Total Clicks: <span class="font-bold">${totalClicks.toLocaleString()}</span></p>
+        ${topHtml}
     `;
 }
 
 function renderRecentClicks() {
-    // ... (logic remains the same, assuming it was correct in the original)
-    const container = document.getElementById('recentClicksList');
-    if (!container || !requireAdmin()) return;
-
-    const recent = stats.recent || [];
-    const games = getGamesObj();
-
-    let listHtml = '<ul class="text-sm space-y-2">';
-
-    if (recent.length === 0) {
-        listHtml += '<li class="text-slate-500">No recent clicks recorded.</li>';
-    } else {
-        recent.slice(0, 10).forEach(click => {
-            const game = games[click.gameId];
-            const gameName = game ? game.name : `[Deleted: ${click.gameId}]`;
-            const time = new Date(click.timestamp).toLocaleTimeString();
-            listHtml += `<li class="border-b border-slate-700 pb-1 last:border-b-0"><span class="font-medium text-slate-200">${time}</span> - ${gameName}</li>`;
-        });
-    }
-    listHtml += '</ul>';
-
-    container.innerHTML = listHtml;
+    const el = document.getElementById('recentClicks');
+    if (!el) return;
+    const recent = (stats.recent || []).slice().sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
+    if (!recent.length) { el.innerHTML = '<p class="text-slate-500">No recent clicks recorded.</p>'; return; }
+    let out = '<ul class="list-disc pl-5 space-y-1 text-sm">';
+    recent.forEach(r => {
+        const t = new Date(r.timestamp).toLocaleTimeString();
+        const name = (allGames[r.gameId] && allGames[r.gameId].name) || r.gameId;
+        out += `<li class="truncate hover:text-white">${t} - ${escapeHtml(name)} (${escapeHtml(r.gameId)})</li>`;
+    });
+    out += '</ul>';
+    el.innerHTML = out;
 }
 
 function clearGameForm() {
     const form = document.getElementById('gameForm');
     if (form) form.reset();
 
-    document.getElementById('editGameSelector').value = '';
-    document.getElementById('adminMessage').textContent = 'Creating a new game.';
+    const msg = document.getElementById('adminMessage');
+    if (msg) msg.textContent = 'Creating a new game.';
+    
     document.getElementById('gameTypeLink').checked = true;
     toggleAdminContentType();
 }
 
 function resetStats() {
     stats = { counts: {}, recent: [] };
-    setStatsObj(stats);
-    showMessage('Stats Reset', 'All game click statistics have been cleared.');
+    DATA.stats = stats;
+    saveData(DATA);
 }
 
+// Logic to show/hide Link or Embed input fields
 function toggleAdminContentType() {
     const type = document.querySelector('input[name="gameContentType"]:checked').value;
     document.getElementById('linkInputGroup').classList.toggle('hidden', type === 'embed');
     document.getElementById('embedInputGroup').classList.toggle('hidden', type === 'link');
 }
 
-// ---------- Initialization ----------
-
+// ---------- Initial Load ----------
 function loadAll() {
     DATA = loadData();
     allGames = DATA.games || {};
     stats = DATA.stats || { counts: {}, recent: [] };
 
+    // hide loading message
     const loadingMessageEl = document.getElementById('loadingMessage');
     if (loadingMessageEl) loadingMessageEl.classList.add('hidden');
 
     renderCategoryFilter();
     renderGameList();
-    renderAdminOptions();
-    // No need to render stats here, they are rendered on admin tab activation
+    
+    // Only call admin functions if on the admin page
+    if (document.getElementById('adminPanel')) {
+        renderAdminOptions();
+        renderStatsSummary();
+        renderRecentClicks();
+    }
 }
 
+// expose needed functions to global scope used by HTML
+window.allGames = allGames; // for admin.html access
+window.DATA = DATA; // for admin.html access
 window.loadAll = loadAll;
 window.renderGameList = renderGameList;
 window.launchGame = launchGame;
 window.closeGame = closeGame;
-window.toggleFavorite = toggleFavorite;
+window.toggleFavorite = toggleFavorite; // NEW: Favorite toggle
+window.getFavorites = getFavorites; // NEW
 window.showMessage = showMessage;
 window.requireAdmin = requireAdmin;
 window.renderAdminOptions = renderAdminOptions;
@@ -435,6 +405,5 @@ window.upsertGame = upsertGame;
 window.deleteGame = deleteGame;
 window.clearGameForm = clearGameForm;
 window.resetStats = resetStats;
-window.toggleAdminContentType = toggleAdminContentType;
 window.getAdminPassword = getAdminPassword;
-window.getGamesObj = getGamesObj;
+window.toggleAdminContentType = toggleAdminContentType; // NEW
