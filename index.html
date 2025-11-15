@@ -16,13 +16,13 @@
 
         <div class="sticky top-0 bg-slate-900 pt-2 z-20">
             <div class="flex justify-center border-b border-slate-700 mb-6">
-                <button data-tab="gameListView" class="tab-button active px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
+                <button id="tabGameList" data-tab="gameListView" class="tab-button active px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
                     Game List
                 </button>
-                <button data-tab="favoritesView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
+                <button id="tabFavorites" data-tab="favoritesView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
                     Favorites
                 </button>
-                <button data-tab="adminView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
+                <button id="tabAdmin" data-tab="adminView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
                     Admin Panel
                 </button>
             </div>
@@ -42,12 +42,6 @@
             </div>
         </div>
 
-        <button id="darkModeToggle" class="fixed bottom-4 right-4 p-3 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition duration-150" onclick="window.toggleDarkMode()">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-        </button>
-
         <p id="loadingMessage" class="text-center text-indigo-400 text-lg my-8">Loading game data...</p>
 
         <div id="gameListView" class="tab-content">
@@ -55,9 +49,11 @@
                 </div>
         </div>
         <div id="favoritesView" class="tab-content hidden">
-            <div id="favoritesGameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                </div>
+             <div id="favoritesListInfo" class="text-slate-400 text-center mb-4">Viewing Favorites:</div>
+             <div id="gameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                 </div>
         </div>
+
 
         <div id="adminView" class="tab-content hidden">
             <div id="loginArea" class="max-w-md mx-auto bg-slate-800 p-6 rounded-xl shadow-2xl">
@@ -84,7 +80,7 @@
                         <form id="gameForm" class="space-y-4">
                             <p id="adminMessage" class="text-yellow-400 font-semibold">Creating a new game.</p>
                             
-                            <div class="grid md:grid-cols-2 gap-4">
+                            <div class="grid md:grid-cols-3 gap-4">
                                 <div>
                                     <label for="gameIdInput" class="block text-slate-300 mb-1">Game ID (slug, required)</label>
                                     <input type="text" id="gameIdInput" required placeholder="e.g. my-awesome-game" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, or hyphens only."
@@ -95,20 +91,16 @@
                                     <input type="text" id="gameNameInput" required placeholder="My Awesome Game"
                                            class="form-input w-full p-3 rounded-lg" />
                                 </div>
-                            </div>
-                            
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="gameImageInput" class="block text-slate-300 mb-1">Image Address (URL)</label>
-                                    <input type="url" id="gameImageInput" placeholder="https://my.site/icon.png"
-                                           class="form-input w-full p-3 rounded-lg" />
-                                </div>
                                 <div>
                                     <label for="gameCategoryInput" class="block text-slate-300 mb-1">Category</label>
                                     <select id="gameCategoryInput" class="form-input w-full p-3 rounded-lg">
                                         </select>
                                 </div>
                             </div>
+                            
+                            <label for="gameImageInput" class="block text-slate-300 mb-1">Image Address (URL)</label>
+                            <input type="url" id="gameImageInput" placeholder="https://my.site/icon.png (optional, uses placeholder if empty)"
+                                   class="form-input w-full p-3 rounded-lg" />
 
                             <h3 class="text-lg font-semibold text-slate-300 pt-2">Game Content Type</h3>
                             <div class="flex space-x-4">
@@ -120,7 +112,7 @@
                                 <label class="flex items-center">
                                     <input type="radio" name="gameContentType" value="embed" id="gameTypeEmbed" onclick="window.toggleAdminContentType()"
                                            class="form-radio h-4 w-4 text-indigo-600">
-                                    <span class="ml-2 text-slate-300">Embed Code (Modal)</span>
+                                    <span class="ml-2 text-slate-300">Embed Code (Modal Player)</span>
                                 </label>
                             </div>
 
@@ -171,7 +163,7 @@
     </div>
     
     <div id="gameModal" class="hidden fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300">
-        <div id="gameModalInner" class="w-11/12 h-5/6 rounded-xl shadow-2xl flex flex-col p-4">
+        <div id="gameModalInner" class="w-11/12 h-5/6 rounded-xl shadow-2xl flex flex-col p-4 bg-slate-800">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
                 <h2 id="modalGameTitle" class="text-2xl font-bold text-indigo-400 truncate"></h2>
                 <div class="flex space-x-3 items-center">
@@ -186,14 +178,15 @@
                 </div>
             </div>
             <div id="gameEmbedContainer" class="flex-grow rounded-lg overflow-hidden" style="width: 100%; height: 100%;"></div>
-            <p class="text-xs text-slate-500 mt-2">Note: This game is loaded via embed code. Not all links can be embedded.</p>
+            <p class="text-xs text-slate-500 mt-2">Note: This game is loaded via embed code. Not all content can be embedded.</p>
         </div>
     </div>
 
-    <div id="messageBox" class="hidden fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300">
-        <div id="messageInner" class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition duration-300 scale-95 opacity-0">
-            <h4 id="messageTitle" class="text-lg font-bold text-gray-800 mb-2"></h4>
-            <p id="messageContent" class="text-gray-600 mb-4"></p>
+
+    <div id="messageBox" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
+        <div class="bg-slate-700 p-6 rounded-lg shadow-xl max-w-sm w-full transition duration-300" style="opacity: 0;">
+            <h4 id="messageTitle" class="text-lg font-bold text-slate-100 mb-2"></h4>
+            <p id="messageContent" class="text-slate-300 mb-4"></p>
             <button id="messageCloseBtn" class="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">
                 Close
             </button>
@@ -203,7 +196,7 @@
     <script src="script.js"></script>
 
     <script>
-        // Tab switching logic (combined index.html/admin.html logic)
+        // Tab switching logic
         function switchTab(targetId) {
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.add('hidden');
@@ -231,8 +224,6 @@
             
             // Re-render game list if switching to Game List or Favorites
             if (targetId === 'gameListView' || targetId === 'favoritesView') {
-                 // FIX: Ensure the correct container is passed to renderGameList if needed, 
-                 // but since renderGameList reads the active tab, this is sufficient.
                  window.renderGameList();
             }
         }
@@ -241,6 +232,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             window.loadAll();
+            
+            // Initial tab setup
+            switchTab('gameListView');
 
             // Set up Tab Switching
             document.querySelectorAll('.tab-button').forEach(btn => {
@@ -249,9 +243,8 @@
 
             // Set up Message Box Close
             document.getElementById('messageCloseBtn').onclick = () => {
-                const inner = document.getElementById('messageInner');
-                inner.classList.remove('scale-100', 'opacity-100');
-                inner.classList.add('scale-95', 'opacity-0');
+                const dialog = document.querySelector('#messageBox > div');
+                if (dialog) dialog.style.opacity = '0';
                 setTimeout(() => {
                     document.getElementById('messageBox').classList.add('hidden');
                 }, 300);
@@ -263,7 +256,7 @@
             document.getElementById('adminLoginBtn').onclick = () => {
                 const password = document.getElementById('adminPassword').value;
                 const loginMessage = document.getElementById('loginMessage');
-                if (password === window.ADMIN_PASSWORD) {
+                if (password === window.getAdminPassword()) {
                     localStorage.setItem('adminLoggedIn', 'true');
                     loginMessage.textContent = 'Login successful!';
                     document.getElementById('adminPassword').value = '';
