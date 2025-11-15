@@ -33,3 +33,91 @@ body {
 #messageBox { display: flex; }
 
 /* Admin page smaller form styles are inherited from tailwind classes */
+/* style.css - Enhanced Styles with Dark/Light Mode */
+
+:root {
+    /* Dark Mode Variables (Default) */
+    --color-bg-primary: #0f172a; /* Slate-900 */
+    --color-bg-secondary: #1e293b; /* Slate-800 */
+    --color-bg-tertiary: #334155; /* Slate-700 */
+    --color-text-primary: #f8fafc; /* Slate-50 */
+    --color-text-secondary: #94a3b8; /* Slate-400 */
+    --color-accent: #7c3aed; /* Indigo-600 */
+    --color-accent-light: #a5b4fc; /* Indigo-300 */
+    --color-border: #334155; /* Slate-700 */
+}
+
+/* Light Mode Overrides */
+.light-mode {
+    --color-bg-primary: #f8fafc; /* Slate-50 */
+    --color-bg-secondary: #ffffff; /* White */
+    --color-bg-tertiary: #f1f5f9; /* Slate-100 */
+    --color-text-primary: #0f172a; /* Slate-900 */
+    --color-text-secondary: #475569; /* Slate-600 */
+    --color-accent: #6366f1; /* Indigo-500 */
+    --color-accent-light: #3730a3; /* Indigo-800 */
+    --color-border: #e2e8f0; /* Slate-200 */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Tab Navigation */
+.tab-button {
+    color: var(--color-text-secondary);
+    border-bottom: 2px solid transparent;
+}
+.tab-button.active {
+    border-bottom: 2px solid var(--color-accent);
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* Game Card Styles */
+.game-card {
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.game-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    background-color: var(--color-bg-tertiary);
+}
+
+.game-card h3 {
+    color: var(--color-accent-light);
+}
+
+/* Input & Select fields */
+.form-input {
+    background-color: var(--color-bg-tertiary);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+}
+.form-input::placeholder {
+    color: var(--color-text-secondary);
+}
+
+/* Message Box/Modal */
+#messageBox, #gameModal {
+    background-color: rgba(0, 0, 0, 0.75);
+}
+
+#gameModalInner {
+    background-color: var(--color-bg-secondary);
+    border: 2px solid var(--color-accent);
+}
+
+#favoriteBtn {
+    color: var(--color-text-secondary);
+}
+#favoriteBtn.favorited {
+    color: #f59e0b; /* Amber-500 */
+}
