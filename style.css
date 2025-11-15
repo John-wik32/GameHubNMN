@@ -1,7 +1,7 @@
 /* style.css - Enhanced Styles with Modal Sizing Fixes */
 
 :root {
-    /* Dark Mode Variables (Default, based on your original) */
+    /* Dark Mode Variables */
     --color-bg-primary: #0f172a; /* Slate-900 */
     --color-bg-secondary: #1e293b; /* Slate-800 */
     --color-bg-tertiary: #334155; /* Slate-700 */
@@ -47,7 +47,7 @@ body {
     color: var(--color-accent-light);
 }
 
-/* Input & Select fields - use theme variables */
+/* Input & Select fields */
 .form-input {
     background-color: var(--color-bg-tertiary);
     border-color: var(--color-border);
@@ -58,12 +58,10 @@ body {
 }
 
 /* Game Modal Fixes (Custom Player) */
-#gameModal {
-    background-color: rgba(0, 0, 0, 0.75);
-}
-
 #gameModalInner {
     /* Critical: Ensures inner content is a flex column to push the embed container to full height */
+    background-color: var(--color-bg-secondary);
+    border: 2px solid var(--color-accent);
     display: flex;
     flex-direction: column;
 }
