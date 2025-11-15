@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unblocked Game Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container mx-auto p-4 md:p-8">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-extrabold tracking-tight text-indigo-400">Unblocked Game Hub</h1>
+      <p class="text-slate-400 mt-2">Find and play your favorite unblocked games.</p>
+    </header>
+
+    <div class="flex justify-center border-b border-slate-700 mb-6 sticky top-0 bg-slate-900 z-10 pt-2">
+      <button id="tabGameList" class="tab-button active px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">Game List</button>
+      <button id="tabAdmin" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">Admin Panel</button>
+    </div>
+
+    <div id="gameListView" class="tab-content">
+      <input type="text" id="gameFilterInput" placeholder="Filter games by name..."
+             class="w-full p-3 mb-6 bg-slate-800 border border-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100 placeholder-slate-400 transition duration-150">
+
+      <div id="gameListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <p id="loadingMessage" class="col-span-full text-center text-lg text-slate-400">Loading games...</p>
+      </div>
+    </div>
+
+    <div id="adminPanelView" class="tab-content hidden max-w-2xl mx-auto bg-slate-800 p-6 rounded-xl shadow-2xl">
+      <h2 class="text-2xl font-bold mb-6 text-indigo-400">Admin Controls</h2>
+
+      <div class="mb-8 border-b border-slate-700 pb-4">
+        <h3 class="text-xl font-semibold mb-3 text-slate-100">Hub Statistics</h3>
+        <div id="statsSummary" class="text-slate-300 mb-3 text-sm">Loading stats...</div>
+        <div class="flex space-x-4">
+          <button id="refreshStatsBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition duration-150">Refresh Stats</button>
+          <button id="resetStatsBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition duration-150">Reset All Stats</button>
+        </div>
+      </div>
+
+      <h3 class="text-xl font-semibold mb-4 text-slate-100">Manage Games</h3>
+
+      <div class="mb-6">
+        <label for="editGameSelector" class="block text-sm font-medium text-slate-300 mb-1">Select Game to Edit</label>
+        <select id="editGameSelector" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100 transition duration-150">
+          <option value="">-- Add New Game --</option>
+        </select>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label for="gameIdInput" class="block text-sm font-medium text-slate-300 mb-1">Game ID (Unique, e.g., flappy-bird)</label>
+          <input type="text" id="gameIdInput" placeholder="Game ID" required
+                 class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100"
+                 oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9-]/g, '')">
+        </div>
+        <div>
+          <label for="gameNameInput" class="block text-sm font-medium text-slate-300 mb-1">Game Name (e.g., Flappy Bird)</label>
+          <input type="text" id="gameNameInput" placeholder="Game Name" required
+                 class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100">
+        </div>
+        <div>
+          <label for="gameLinkInput" class="block text-sm font-medium text-slate-300 mb-1">Link/URL (Optional)</label>
+          <input type="url" id="gameLinkInput" placeholder="URL (e.g., https://example.com/game.html)"
+                 class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100">
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="gameVisibleInput" checked class="h-4 w-4 text-indigo-600 bg-slate-700 border-slate-600 rounded focus:ring-indigo-500">
+          <label for="gameVisibleInput" class="ml-2 block text-sm text-slate-300">Visible to Users</label>
+        </div>
+        <div id="adminMessage" class="text-sm text-yellow-400"></div>
+        <button id="saveGameBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition duration-150 shadow-md">Save Game</button>
+      </div>
+
+      <div class="mt-8 border-t border-slate-700 pt-6">
+        <h3 class="text-xl font-semibold mb-3 text-slate-100">Recent Clicks Log</h3>
+        <div id="recentClicks" class="text-sm text-slate-400 overflow-y-scroll max-h-48 p-3 bg-slate-900 rounded-lg"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center p-4">
+    <div class="relative w-full h-full max-w-7xl max-h-5xl">
+      <button id="closeGameBtn" class="absolute top-0 right-0 m-4 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 z-50 transition duration-150">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <iframe id="gameIframe" src="" class="w-full h-full border-0 rounded-xl" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <div id="messageBox" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+      <h4 id="messageTitle" class="text-lg font-bold text-gray-800 mb-2"></h4>
+      <p id="messageContent" class="text-gray-600 mb-4"></p>
+      <button id="messageCloseBtn" class="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">Close</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
