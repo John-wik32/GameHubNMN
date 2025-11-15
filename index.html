@@ -55,7 +55,7 @@
                 </div>
         </div>
         <div id="favoritesView" class="tab-content hidden">
-            <div id="gameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div id="favoritesGameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 </div>
         </div>
 
@@ -87,7 +87,7 @@
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
                                     <label for="gameIdInput" class="block text-slate-300 mb-1">Game ID (slug, required)</label>
-                                    <input type="text" id="gameIdInput" required placeholder="e.g. my-awesome-game" pattern="^[a-z0-9-]+$" title="Lowercase letters, numbers, or hyphens only."
+                                    <input type="text" id="gameIdInput" required placeholder="e.g. my-awesome-game" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, or hyphens only."
                                            class="form-input w-full p-3 rounded-lg" />
                                 </div>
                                 <div>
@@ -178,7 +178,7 @@
                     <button id="favoriteBtn" class="p-1" title="Toggle Favorite">
                         </button>
                     <a id="modalGameLink" href="#" target="_blank" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition duration-150">
-                        Open in New Tab
+                        Open Source Link
                     </a>
                     <button onclick="window.closeGame()" class="py-1 px-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition duration-150">
                         Close
@@ -231,6 +231,8 @@
             
             // Re-render game list if switching to Game List or Favorites
             if (targetId === 'gameListView' || targetId === 'favoritesView') {
+                 // FIX: Ensure the correct container is passed to renderGameList if needed, 
+                 // but since renderGameList reads the active tab, this is sufficient.
                  window.renderGameList();
             }
         }
@@ -291,7 +293,6 @@
                     document.getElementById('gameVisibleInput').checked = g.visible !== false;
                     document.getElementById('adminMessage').textContent = 'Editing existing game.';
                     
-                    // Set content type and value
                     const typeIsLink = g.type === 'link';
                     document.getElementById('gameTypeLink').checked = typeIsLink;
                     document.getElementById('gameTypeEmbed').checked = !typeIsLink;
