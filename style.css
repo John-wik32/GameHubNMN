@@ -1,39 +1,4 @@
-/* style.css - copied & cleaned from your original inline CSS */
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: #0f172a; /* Slate-900 */
-    color: #f8fafc; /* Slate-50 */
-}
-
-/* Custom scrollbar for game list */
-#gameListContainer {
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.game-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-/* small helper */
-.tab-button.active {
-    border-bottom: 2px solid #7c3aed; /* indigo-400 */
-    color: #7c3aed;
-    font-weight: 600;
-}
-
-/* modal simple layout */
-#gameModal { display: none; }
-#gameModal.hidden { display: none; }
-#gameModal .iframe { width: 100%; height: 100%; }
-
-/* message box */
-#messageBox.hidden { display: none; }
-#messageBox { display: flex; }
-
-/* Admin page smaller form styles are inherited from tailwind classes */
-/* style.css - Enhanced Styles with Dark/Light Mode */
+/* style.css - Enhanced Styles with Dark/Light Mode & Modal Sizing Fixes */
 
 :root {
     /* Dark Mode Variables (Default) */
@@ -113,11 +78,21 @@ body {
 #gameModalInner {
     background-color: var(--color-bg-secondary);
     border: 2px solid var(--color-accent);
+    /* Fix: Ensure inner content is a flex column */
+    display: flex;
+    flex-direction: column;
 }
 
-#favoriteBtn {
-    color: var(--color-text-secondary);
+/* Fix: Ensure the embed container takes all available height in the modal */
+#gameEmbedContainer {
+    flex-grow: 1;
+    overflow: hidden;
+    min-height: 0; /* Critical for flex layout with internal absolute/iframe elements */
 }
-#favoriteBtn.favorited {
-    color: #f59e0b; /* Amber-500 */
+
+/* Fix: Ensure any iframe inside the container is full size */
+#gameEmbedContainer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
 }
