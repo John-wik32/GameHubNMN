@@ -3,7 +3,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unblocked Game Hub</title>
-    <!-- Load Tailwind CSS -->
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -15,34 +15,39 @@
             <p class="text-slate-400 mt-2">Find and play your favorite unblocked games.</p>
         </header>
 
-        <!-- Tab Navigation -->
-        <div class="flex justify-center border-b border-slate-700 mb-6 sticky top-0 bg-slate-900 z-10 pt-2">
-            <button id="tabGameList" class="tab-button active px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
-                Game List
-            </button>
-            <button id="tabAdmin" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
-                Admin Panel
+        <div id="tabNavigation" class="flex justify-center border-b border-slate-700 mb-6 sticky top-0 bg-slate-900 z-10 pt-2">
+            </div>
+
+        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+            <input type="text" id="gameFilterInput" placeholder="Filter by Name, ID, Category, or URL Domain..."
+                   class="w-full sm:w-2/3 p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100 placeholder-slate-400 transition duration-150">
+
+            <button id="randomGameBtn" class="w-full sm:w-1/3 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-150">
+                🎲 Random Game
             </button>
         </div>
 
-        <!-- Game List View -->
-        <div id="gameListView" class="tab-content">
-            <input type="text" id="gameFilterInput" placeholder="Filter games by name..."
-                   class="w-full p-3 mb-6 bg-slate-800 border border-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-slate-100 placeholder-slate-400 transition duration-150">
 
+        <div id="gameListView" class="tab-content">
             <div id="gameListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <!-- Games will be injected here -->
                 <p id="loadingMessage" class="col-span-full text-center text-lg text-slate-400">Loading games...</p>
             </div>
         </div>
 
+        <div id="favoritesView" class="tab-content hidden">
+            <div id="gameListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                </div>
+        </div>
+
+        <div id="recentView" class="tab-content hidden">
+            <div id="gameListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                </div>
+        </div>
     </div>
 
-    <!-- The actual game iframe/modal (for better UX) -->
     <div id="gameModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center p-4">
         <div class="relative w-full h-full max-w-7xl max-h-5xl">
             <button id="closeGameBtn" class="absolute top-0 right-0 m-4 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 z-50 transition duration-150">
-                <!-- X icon -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -51,7 +56,6 @@
         </div>
     </div>
 
-    <!-- The message box/alert replacement -->
     <div id="messageBox" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
             <h4 id="messageTitle" class="text-lg font-bold text-gray-800 mb-2"></h4>
@@ -64,13 +68,13 @@
 
     <script src="script.js"></script>
     <script>
-        // Wire up admin tab to open admin.html (keeps UI similar)
-        document.getElementById('tabAdmin').onclick = () => {
-            window.location.href = 'admin.html';
+        // Wire up tab clicks (now handled by switchTab in script.js)
+        document.getElementById('tabNavigation').onclick = (e) => {
+            if (e.target.classList.contains('tab-button')) {
+                switchTab(e.target.id);
+            }
         };
-        document.getElementById('tabGameList').onclick = () => {
-            // stay on index
-        };
+
         // close modal
         document.getElementById('closeGameBtn').onclick = () => {
             closeGame();
@@ -79,11 +83,23 @@
             document.getElementById('messageBox').classList.add('hidden');
         };
 
+        // Filter input
         document.getElementById('gameFilterInput').oninput = renderGameList;
+
+        // Random Game Button
+        document.getElementById('randomGameBtn').onclick = launchRandomGame;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadAll(); // from script.js
+            checkAdminAccess(); // from script.js
+            
+            // PWA Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered: ', reg))
+                    .catch(err => console.log('Service Worker registration failed: ', err));
+            }
         });
     </script>
 </body>
