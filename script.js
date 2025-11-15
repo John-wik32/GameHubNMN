@@ -1,4 +1,4 @@
-/* script.js - Core Logic for Game Hub */
+/* script.js - Core Logic for Game Hub (Fixed) */
 
 // ---------- Global State & Constants ----------
 const STORAGE_KEY = 'unblockhub_data';
@@ -10,7 +10,8 @@ let DATA = null;
 let allGames = {};
 let stats = { counts: {}, recent: [] };
 
-// Default categories for the dropdown
+// FIX: Robust Placeholder URL
+const PLACEHOLDER_IMG_URL = 'https://placehold.co/100x70/334155/94a3b8?text=NO+IMG';
 const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulation', 'Other'];
 
 // ---------- LocalStorage & Data Helpers ----------
@@ -19,7 +20,7 @@ const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulatio
 function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-        // Updated default games with new properties
+        // Updated default games with new properties and robust placeholders
         const defaultData = {
             games: {
                 'flappy-bird': { id: 'flappy-bird', name: 'Flappy Bird Clone', image: 'https://placehold.co/100x70/1e293b/94a3b8?text=FB', category: 'Arcade', type: 'link', content: 'https://flappybird.io/', visible: true, dateAdded: Date.now() - 3600000 },
@@ -34,7 +35,7 @@ function loadData() {
     }
     try {
         const data = JSON.parse(raw);
-        // Ensure all new fields exist for old entries
+        // Ensure all new fields exist for old entries and remove old 'link' property
         for (const id in data.games) {
             const game = data.games[id];
             game.image = game.image || '';
@@ -42,7 +43,7 @@ function loadData() {
             game.type = game.type || (game.link ? 'link' : 'embed');
             game.content = game.content || game.link || '';
             game.dateAdded = game.dateAdded || Date.now();
-            delete game.link; // Remove old 'link' property if it exists
+            if (game.link) delete game.link;
         }
         return data;
     } catch (e) {
@@ -52,11 +53,7 @@ function loadData() {
     }
 }
 
-/** Saves the global DATA object to localStorage. */
-function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
-}
-
+function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
 function getGamesObj() { return (DATA && DATA.games) ? DATA.games : {}; }
 function setGamesObj(obj) { DATA.games = obj; saveData(); allGames = obj; }
 function getStatsObj() { return (DATA && DATA.stats) ? DATA.stats : { counts: {}, recent: [] }; }
@@ -64,18 +61,16 @@ function setStatsObj(obj) { DATA.stats = obj; saveData(); stats = obj; }
 
 // ---------- Favorites System ----------
 
-/** Gets the array of favorited game IDs. */
 function getFavorites() {
     const raw = localStorage.getItem(FAVORITES_KEY);
     return raw ? JSON.parse(raw) : [];
 }
 
-/** Sets the array of favorited game IDs. */
 function setFavorites(favorites) {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
 }
 
-/** Toggles a game's favorite status. */
+/** Toggles a game's favorite status and updates UI. */
 function toggleFavorite(gameId) {
     const favorites = getFavorites();
     const index = favorites.indexOf(gameId);
@@ -87,11 +82,8 @@ function toggleFavorite(gameId) {
     }
 
     setFavorites(favorites);
-    // Re-render the game list if we are on the favorites tab, and update the button state
-    renderGameList();
-    if (document.getElementById('favoriteBtn')) {
-        updateFavoriteButton(gameId);
-    }
+    renderGameList(); // Update main view card
+    updateFavoriteButton(gameId); // Update modal button if open
 }
 
 /** Updates the favorite button inside the modal/card. */
@@ -100,14 +92,25 @@ function updateFavoriteButton(gameId) {
     if (!btn) return;
 
     const isFavorited = getFavorites().includes(gameId);
-    btn.onclick = () => toggleFavorite(gameId);
+    
+    // FIX: Ensure onclick is correctly set if the element exists
+    btn.onclick = (e) => { 
+        toggleFavorite(gameId);
+        if (e) e.stopPropagation();
+    };
+
     btn.classList.toggle('favorited', isFavorited);
-    btn.innerHTML = isFavorited ?
-        '<svg class="w-6 h-6 fill-current text-amber-500" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/></svg>' :
-        '<svg class="w-6 h-6 stroke-current text-slate-400 hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.575.575 0 011.04 0l2.125 5.102a.575.575 0 00.463.318l5.584.814a.575.575 0 01.328.986l-4.04 3.931a.575.575 0 00-.16.594l.954 5.577a.575.575 0 01-.836.605L12 18.04l-4.99 2.625a.575.575 0 01-.836-.605l.954-5.577a.575.575 0 00-.16-.594l-4.04-3.931a.575.575 0 01.328-.986l5.584-.814a.575.575 0 00.463-.318l2.125-5.102z" /></svg>';
+    
+    // Using a single SVG path for simplicity
+    const svgContent = `<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/></svg>`;
+
+    btn.innerHTML = svgContent;
+    btn.querySelector('svg').classList.remove('text-slate-400', 'hover:text-amber-500', 'text-amber-500');
+    btn.querySelector('svg').classList.add(isFavorited ? 'text-amber-500' : 'text-slate-400', isFavorited ? '' : 'hover:text-amber-500');
 }
 
-// ---------- Dark Mode System ----------
+
+// ---------- Dark Mode System (remains the same) ----------
 
 function applyDarkMode(isDark) {
     document.body.classList.toggle('light-mode', !isDark);
@@ -118,19 +121,17 @@ function loadDarkMode() {
     const preference = localStorage.getItem(DARK_MODE_KEY);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    // Apply dark mode if preference is 'dark', or if no preference is set and system prefers dark
     const isDark = (preference === 'dark') || (preference === null && prefersDark);
     applyDarkMode(isDark);
 }
 
 function toggleDarkMode() {
     const isLight = document.body.classList.contains('light-mode');
-    applyDarkMode(isLight); // Toggle (if light is present, go dark; if not, go light)
+    applyDarkMode(isLight);
 }
 
 // ---------- UI / Rendering Functions ----------
 
-/** Shows a custom message box instead of alert(). */
 function showMessage(title, content) {
     document.getElementById('messageTitle').textContent = title;
     document.getElementById('messageContent').textContent = content;
@@ -160,31 +161,22 @@ function renderGameList() {
 
     // 1. Filter
     gamesArray = gamesArray.filter(g => {
-        // Filter by visibility
         if (g.visible === false) return false;
-        // Filter by category
         if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-        // Filter by search text
         if (!g.name.toLowerCase().includes(filterText) && !g.id.toLowerCase().includes(filterText)) return false;
-        // Filter by favorites tab
         if (isFavoritesTab && !favorites.includes(g.id)) return false;
         return true;
     });
 
-    // 2. Sort
+    // 2. Sort (remains the same)
     gamesArray.sort((a, b) => {
         const clicksA = stats.counts[a.id] || 0;
         const clicksB = stats.counts[b.id] || 0;
-
         switch (sortBy) {
-            case 'popular':
-                return clicksB - clicksA; // Most popular first
-            case 'az':
-                return a.name.localeCompare(b.name); // A-Z
-            case 'newest':
-                return b.dateAdded - a.dateAdded; // Newest first
-            default:
-                return clicksB - clicksA; // Fallback to popular
+            case 'popular': return clicksB - clicksA;
+            case 'az': return a.name.localeCompare(b.name);
+            case 'newest': return b.dateAdded - a.dateAdded;
+            default: return clicksB - clicksA;
         }
     });
 
@@ -196,19 +188,27 @@ function renderGameList() {
         html = gamesArray.map(game => {
             const clickCount = stats.counts[game.id] || 0;
             const isFavorited = favorites.includes(game.id);
+            const imageSrc = game.image || PLACEHOLDER_IMG_URL;
 
             return `
-                <div id="game-card-${game.id}" class="game-card p-4 rounded-xl shadow-lg cursor-pointer flex flex-col justify-between" onclick="launchGame('${game.id}')">
-                    <img src="${game.image || 'https://placehold.co/100x70/1e293b/94a3b8?text=NO+IMG'}" alt="${game.name}" class="w-full h-24 object-cover rounded-lg mb-3">
-                    <div class="flex items-center justify-between">
+                <div id="game-card-${game.id}" class="game-card p-4 rounded-xl shadow-lg flex flex-col justify-between">
+                    
+                    <div onclick="window.launchGame('${game.id}')" class="cursor-pointer">
+                        <img src="${imageSrc}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG_URL}'" 
+                             alt="${game.name}" loading="lazy" class="w-full h-24 object-cover rounded-lg mb-3">
                         <h3 class="text-lg font-bold truncate">${game.name}</h3>
-                        <div class="p-1 rounded-full ${isFavorited ? 'text-amber-500' : 'text-slate-400'}" title="${isFavorited ? 'Favorited' : 'Add to Favorites'}">
-                            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/></svg>
-                        </div>
                     </div>
-                    <p class="text-sm text-slate-400 mt-1">
-                        <span class="font-bold text-xs">${game.category}</span> &bull; ${clickCount.toLocaleString()} plays
-                    </p>
+
+                    <div class="flex justify-between items-center mt-2">
+                        <p class="text-sm text-slate-400">
+                            <span class="font-bold text-xs">${game.category}</span> &bull; ${clickCount.toLocaleString()} plays
+                        </p>
+                        <button onclick="window.toggleFavorite('${game.id}'); event.stopPropagation();" class="p-1" title="Toggle Favorite">
+                            <svg class="w-5 h-5 fill-current ${isFavorited ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -217,30 +217,11 @@ function renderGameList() {
     container.innerHTML = html;
 }
 
-// Renders the category filter dropdown
-function renderCategoryFilter() {
-    const select = document.getElementById('categoryFilter');
-    if (!select) return;
-
-    let options = '<option value="All">All Categories</option>';
-    DEFAULT_CATEGORIES.forEach(cat => {
-        options += `<option value="${cat}">${cat}</option>`;
-    });
-    select.innerHTML = options;
-}
-
-/** Logs a game click and updates stats. */
 function logClick(gameId) {
     const currentStats = getStatsObj();
-
     currentStats.counts[gameId] = (currentStats.counts[gameId] || 0) + 1;
-
-    currentStats.recent.unshift({
-        gameId: gameId,
-        timestamp: Date.now()
-    });
-    currentStats.recent = currentStats.recent.slice(0, 50); // Keep max 50 recent logs
-
+    currentStats.recent.unshift({ gameId: gameId, timestamp: Date.now() });
+    currentStats.recent = currentStats.recent.slice(0, 50);
     setStatsObj(currentStats);
 }
 
@@ -253,7 +234,7 @@ function launchGame(gameId) {
     }
 
     logClick(gameId);
-    renderGameList(); // Update count immediately on main page
+    renderGameList();
 
     const modal = document.getElementById('gameModal');
     const titleEl = document.getElementById('modalGameTitle');
@@ -261,27 +242,38 @@ function launchGame(gameId) {
     const embedContainer = document.getElementById('gameEmbedContainer');
 
     titleEl.textContent = game.name;
-
-    // Set the state of the favorite button inside the modal
     updateFavoriteButton(gameId);
-
+    
+    // FIX: Clear previous content before inserting new one
+    embedContainer.innerHTML = '';
+    
     if (game.type === 'link') {
-        // FIX: Open in new tab for external links to bypass X-Frame-Options
         window.open(game.content, '_blank');
-        modal.classList.add('hidden'); // Ensure modal is hidden for link type
+        modal.classList.add('hidden');
         showMessage('Game Launched', `The game '${game.name}' has been opened in a new tab. Embedding is blocked for this game.`);
     } else if (game.type === 'embed') {
-        // Embed code type: show in modal
-        gameLinkEl.href = 'javascript:void(0)';
-        gameLinkEl.textContent = 'External Link Unavailable';
-        gameLinkEl.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        // Prepare link element for embed type (try to extract the src)
+        const srcMatch = game.content.match(/src=["'](.*?)["']/);
+        gameLinkEl.href = srcMatch ? srcMatch[1] : 'javascript:void(0)';
+        gameLinkEl.textContent = 'View Embed Source Link';
+        gameLinkEl.classList.remove('opacity-50', 'cursor-not-allowed');
 
-        embedContainer.innerHTML = game.content; // Insert the raw embed code (e.g., iframe)
+        // FIX: Wrap the embed content in a full-size div for proper sizing
+        embedContainer.innerHTML = `<div class="w-full h-full">${game.content}</div>`;
+        
+        // FIX: Find iframes and ensure they have full height/width
+        const iframe = embedContainer.querySelector('iframe');
+        if(iframe) {
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.setAttribute('loading', 'lazy');
+        }
+
         modal.classList.remove('hidden');
     }
 }
 
-/** Cleans up and closes the game modal. */
 function closeGame() {
     const modal = document.getElementById('gameModal');
     const embedContainer = document.getElementById('gameEmbedContainer');
@@ -292,7 +284,7 @@ function closeGame() {
 }
 
 
-// ---------- Admin Functions (Reorganized) ----------
+// ---------- Admin Functions (remains the same) ----------
 
 function requireAdmin() {
     return localStorage.getItem('adminLoggedIn') === 'true';
@@ -305,14 +297,12 @@ function renderAdminOptions() {
     const gameArray = Object.values(allGames).sort((a, b) => a.name.localeCompare(b.name));
 
     let html = '<option value="">-- Add New Game --</option>';
-
     html += gameArray.map(game =>
         `<option value="${game.id}">${game.name} (${game.id})</option>`
     ).join('');
 
     selector.innerHTML = html;
 
-    // Render category list for the admin form
     const categorySelect = document.getElementById('gameCategoryInput');
     if (categorySelect) {
         let options = DEFAULT_CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('');
@@ -330,7 +320,7 @@ function upsertGame(gameData) {
         type: gameData.type,
         content: gameData.content,
         visible: gameData.visible,
-        dateAdded: games[gameData.id] ? games[gameData.id].dateAdded : Date.now() // Preserve existing date or set new
+        dateAdded: games[gameData.id] ? games[gameData.id].dateAdded : Date.now()
     };
     setGamesObj(games);
     showMessage('Success', `Game "${gameData.name}" has been saved/updated.`);
@@ -351,11 +341,10 @@ function clearGameForm() {
     const form = document.getElementById('gameForm');
     if (form) form.reset();
 
-    // Explicitly reset non-form elements
     document.getElementById('editGameSelector').value = '';
     document.getElementById('adminMessage').textContent = 'Creating a new game.';
     document.getElementById('gameTypeLink').checked = true;
-    toggleAdminContentType(); // Ensure the link field is visible
+    toggleAdminContentType();
 }
 
 function renderStatsSummary() {
@@ -404,7 +393,6 @@ function resetStats() {
     showMessage('Stats Reset', 'All game click statistics have been cleared.');
 }
 
-// Toggle visibility of link/embed code inputs
 function toggleAdminContentType() {
     const type = document.querySelector('input[name="gameContentType"]:checked').value;
     document.getElementById('linkInputGroup').classList.toggle('hidden', type === 'embed');
@@ -413,33 +401,39 @@ function toggleAdminContentType() {
 
 // ---------- Initialization ----------
 
+function renderCategoryFilter() {
+    const select = document.getElementById('categoryFilter');
+    if (!select) return;
+
+    let options = '<option value="All">All Categories</option>';
+    DEFAULT_CATEGORIES.forEach(cat => {
+        options += `<option value="${cat}">${cat}</option>`;
+    });
+    select.innerHTML = options;
+}
+
 function loadAll() {
     DATA = loadData();
     allGames = DATA.games || {};
     stats = DATA.stats || { counts: {}, recent: [] };
 
-    // Apply dark mode preference
     loadDarkMode();
 
-    // Hide loading message and render main view
     const loadingMessageEl = document.getElementById('loadingMessage');
     if (loadingMessageEl) loadingMessageEl.classList.add('hidden');
 
     renderCategoryFilter();
     renderGameList();
-    renderAdminOptions(); // Load initial admin data
+    renderAdminOptions();
 }
 
-// Expose global functions needed by HTML
 window.loadAll = loadAll;
 window.renderGameList = renderGameList;
 window.launchGame = launchGame;
 window.closeGame = closeGame;
 window.toggleDarkMode = toggleDarkMode;
 window.toggleFavorite = toggleFavorite;
-window.showMessage = showMessage; // Expose custom alert
-
-// Expose admin functions for use in admin panel logic
+window.showMessage = showMessage;
 window.requireAdmin = requireAdmin;
 window.renderAdminOptions = renderAdminOptions;
 window.renderStatsSummary = renderStatsSummary;
@@ -450,4 +444,4 @@ window.clearGameForm = clearGameForm;
 window.resetStats = resetStats;
 window.toggleAdminContentType = toggleAdminContentType;
 window.ADMIN_PASSWORD = ADMIN_PASSWORD;
-window.getGamesObj = getGamesObj; // Needed for admin loading logic
+window.getGamesObj = getGamesObj;
