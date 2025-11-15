@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unblocked Game Hub - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-400">Unblocked Game Hub — Admin</h1>
+            <p class="text-slate-400 mt-2">Manage games and view stats (local only).</p>
+        </header>
+
+        <div id="loginArea" class="max-w-md mx-auto bg-slate-800 p-6 rounded-xl shadow-2xl">
+            <h2 class="text-xl font-semibold text-slate-100 mb-4">Admin Login</h2>
+            <input id="adminPassword" type="password" placeholder="Admin Password"
+                   class="w-full p-3 mb-4 bg-slate-700 border border-slate-600 rounded-lg text-slate-100">
+            <div class="flex space-x-4">
+                <button id="adminLoginBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg">Login</button>
+                <button id="backBtn" class="w-full py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-lg">Back</button>
+            </div>
+            <p class="text-sm text-slate-400 mt-3">Password is stored locally in your browser. The chosen password for this build: <strong>2025</strong></p>
+        </div>
+
+        <!-- Admin Panel (hidden until logged in) -->
+        <div id="adminPanel" class="hidden max-w-3xl mx-auto mt-8 bg-slate-800 p-6 rounded-xl shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-indigo-400">Admin Controls</h2>
+                <div>
+                    <button id="logoutBtn" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">Logout</button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="mb-6 border-b border-slate-700 pb-4">
+                <h3 class="text-lg font-semibold text-slate-100">Hub Statistics</h3>
+                <div id="statsSummary" class="text-slate-300 mb-3 text-sm">Loading stats...</div>
+                <div class="flex space-x-4">
+                    <button id="refreshStatsBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Refresh Stats</button>
+                    <button id="resetStatsBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">Reset All Stats</button>
+                </div>
+            </div>
+
+            <!-- Game management -->
+            <div class="mb-6">
+                <label class="block text-sm text-slate-300 mb-2">Edit existing game</label>
+                <select id="editGameSelector" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-4">
+                    <option value="">-- Add New Game --</option>
+                </select>
+
+                <label class="block text-sm text-slate-300 mb-1">Game ID</label>
+                <input id="gameIdInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
+
+                <label class="block text-sm text-slate-300 mb-1">Game Name</label>
+                <input id="gameNameInput" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
+
+                <label class="block text-sm text-slate-300 mb-1">Game Link (optional)</label>
+                <input id="gameLinkInput" type="url" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 mb-3">
+
+                <div class="flex items-center mb-3">
+                    <input id="gameVisibleInput" type="checkbox" class="h-4 w-4 text-indigo-600 bg-slate-700 border-slate-600 rounded">
+                    <label for="gameVisibleInput" class="ml-2 text-slate-300">Visible to users</label>
+                </div>
+
+                <div id="adminMessage" class="text-sm text-yellow-400 mb-3"></div>
+
+                <div class="flex space-x-4">
+                    <button id="saveGameBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg w-full">Save Game</button>
+                    <button id="deleteGameBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg w-full">Delete Selected</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-slate-100 mb-2">Recent Clicks</h3>
+                <div id="recentClicks" class="bg-slate-900 p-3 rounded-lg text-slate-300 max-h-48 overflow-y-auto"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Admin page wiring
+        document.getElementById('backBtn').onclick = () => { window.location.href = 'index.html'; };
+
+        document.getElementById('adminLoginBtn').onclick = () => {
+            const pw = document.getElementById('adminPassword').value;
+            if (pw === getAdminPassword()) {
+                localStorage.setItem('adminLoggedIn', 'true');
+                showAdminPanel();
+            } else {
+                alert('Wrong password');
+            }
+        };
+
+        document.getElementById('logoutBtn').onclick = () => {
+            localStorage.removeItem('adminLoggedIn');
+            location.reload();
+        };
+
+        document.getElementById('refreshStatsBtn').onclick = () => {
+            renderStatsSummary();
+            renderRecentClicks();
+        };
+
+        document.getElementById('resetStatsBtn').onclick = () => {
+            const ok = confirm('Reset all stats? This cannot be undone.');
+            if (!ok) return;
+            resetStats();
+            renderStatsSummary();
+            renderRecentClicks();
+            alert('Stats reset');
+        };
+
+        // Save / Delete logic
+        document.getElementById('saveGameBtn').onclick = () => {
+            const idEl = document.getElementById('gameIdInput');
+            const id = idEl.value.trim();
+            const name = document.getElementById('gameNameInput').value.trim();
+            const link = document.getElementById('gameLinkInput').value.trim();
+            const visible = document.getElementById('gameVisibleInput').checked;
+
+            if (!id || !name) { alert('ID and Name required'); return; }
+            if (!/^[a-z0-9-]+$/.test(id)) { alert('ID must be lowercase letters, numbers, or hyphens'); return; }
+
+            upsertGame({ id, name, link, visible });
+            renderAdminOptions();
+            renderGameList();
+            alert('Saved');
+        };
+
+        document.getElementById('deleteGameBtn').onclick = () => {
+            const sel = document.getElementById('editGameSelector').value;
+            if (!sel) { alert('Select a game to delete'); return; }
+            if (!confirm('Delete this game?')) return;
+            deleteGame(sel);
+            renderAdminOptions();
+            renderGameList();
+            clearGameForm();
+            alert('Deleted');
+        };
+
+        // when loading admin page: check login state
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('adminLoggedIn') === 'true') {
+                showAdminPanel();
+            } else {
+                // keep login area visible
+                document.getElementById('loginArea').classList.remove('hidden');
+            }
+
+            // hook selector change behavior (works because script.js sets change handler)
+            document.getElementById('editGameSelector').onchange = (e) => {
+                const id = e.target.value;
+                if (id && getGamesObj()[id]) {
+                    const g = getGamesObj()[id];
+                    document.getElementById('gameIdInput').value = g.id;
+                    document.getElementById('gameNameInput').value = g.name;
+                    document.getElementById('gameLinkInput').value = g.link || '';
+                    document.getElementById('gameVisibleInput').checked = g.visible !== false;
+                    document.getElementById('adminMessage').textContent = 'Editing existing game.';
+                } else {
+                    clearGameForm();
+                }
+            };
+        });
+
+        function showAdminPanel() {
+            document.getElementById('loginArea').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            // load data into UI
+            renderAdminOptions();
+            renderStatsSummary();
+            renderRecentClicks();
+        }
+    </script>
+</body>
+</html>
