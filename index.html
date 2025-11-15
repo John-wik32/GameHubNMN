@@ -1,0 +1,17 @@
+/**
+ * Main function to serve the web app.
+ * All logic is now handled client-side in index.html with Firebase.
+ */
+function doGet(e) {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('Unblocked Game Hub')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Helper function (no longer used by index.html but good to keep
+ * if you ever build another page that needs it).
+ */
+function include(filename) {
+  return HtmlService.createHtmlTemplateFromFile(filename).getRawContent();
+}
