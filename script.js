@@ -1,18 +1,15 @@
-/* script.js - Core Logic for Game Hub (Fixed) */
+/* script.js - Core Logic for Game Hub (Fixed & Enhanced) */
 
 // ---------- Global State & Constants ----------
 const STORAGE_KEY = 'unblockhub_data';
 const FAVORITES_KEY = 'unblockhub_favorites';
-const DARK_MODE_KEY = 'unblockhub_darkmode';
-const ADMIN_PASSWORD = '2025';
+const PLACEHOLDER_IMG_URL = 'https://placehold.co/100x70/334155/94a3b8?text=NO+IMG';
+const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulation', 'Other'];
+const ADMIN_PASSWORD = '2025'; // Default admin password
 
 let DATA = null;
 let allGames = {};
 let stats = { counts: {}, recent: [] };
-
-// FIX: Robust Placeholder URL
-const PLACEHOLDER_IMG_URL = 'https://placehold.co/100x70/334155/94a3b8?text=NO+IMG';
-const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulation', 'Other'];
 
 // ---------- LocalStorage & Data Helpers ----------
 
@@ -20,12 +17,12 @@ const DEFAULT_CATEGORIES = ['Action', 'Puzzle', 'Strategy', 'Arcade', 'Simulatio
 function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-        // Updated default games with new properties and robust placeholders
+        // Initial setup with new properties
         const defaultData = {
             games: {
-                'flappy-bird': { id: 'flappy-bird', name: 'Flappy Bird Clone', image: 'https://placehold.co/100x70/1e293b/94a3b8?text=FB', category: 'Arcade', type: 'link', content: 'https://flappybird.io/', visible: true, dateAdded: Date.now() - 3600000 },
-                'snake-game': { id: 'snake-game', name: 'Classic Snake', image: 'https://placehold.co/100x70/1e293b/94a3b8?text=SNAKE', category: 'Arcade', type: 'link', content: 'https://playsnake.org/', visible: true, dateAdded: Date.now() - 7200000 },
-                'tetris': { id: 'tetris', name: 'Simple Tetris', image: 'https://placehold.co/100x70/1e293b/94a3b8?text=TETRIS', category: 'Puzzle', type: 'link', content: 'https://tetris.com/play-tetris/', visible: true, dateAdded: Date.now() }
+                'flappy-bird': { id: 'flappy-bird', name: 'Flappy Bird Clone', image: '', category: 'Arcade', type: 'link', content: 'https://flappybird.io/', visible: true, dateAdded: Date.now() - 3600000 },
+                'snake-game': { id: 'snake-game', name: 'Classic Snake', image: '', category: 'Arcade', type: 'link', content: 'https://playsnake.org/', visible: true, dateAdded: Date.now() - 7200000 },
+                'embed-example': { id: 'embed-example', name: 'Embedded Game Test', image: '', category: 'Other', type: 'embed', content: '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" style="width: 100%; height: 100%; border:0;" allow="autoplay; fullscreen; picture-in-picture"></iframe>', visible: true, dateAdded: Date.now() }
             },
             stats: { counts: {}, recent: [] },
             admin_password: ADMIN_PASSWORD
@@ -35,15 +32,23 @@ function loadData() {
     }
     try {
         const data = JSON.parse(raw);
-        // Ensure all new fields exist for old entries and remove old 'link' property
+        // Migration logic for older games that only had 'link'
         for (const id in data.games) {
             const game = data.games[id];
             game.image = game.image || '';
             game.category = game.category || 'Other';
-            game.type = game.type || (game.link ? 'link' : 'embed');
-            game.content = game.content || game.link || '';
+            
+            // New type/content logic
+            if (game.link) {
+                game.type = 'link';
+                game.content = game.link;
+                delete game.link; // Clean up old property
+            } else {
+                game.type = game.type || 'embed'; // Assume embed if no link found
+                game.content = game.content || '';
+            }
+            
             game.dateAdded = game.dateAdded || Date.now();
-            if (game.link) delete game.link;
         }
         return data;
     } catch (e) {
@@ -58,6 +63,7 @@ function getGamesObj() { return (DATA && DATA.games) ? DATA.games : {}; }
 function setGamesObj(obj) { DATA.games = obj; saveData(); allGames = obj; }
 function getStatsObj() { return (DATA && DATA.stats) ? DATA.stats : { counts: {}, recent: [] }; }
 function setStatsObj(obj) { DATA.stats = obj; saveData(); stats = obj; }
+function getAdminPassword() { return DATA.admin_password || ADMIN_PASSWORD; }
 
 // ---------- Favorites System ----------
 
@@ -86,14 +92,13 @@ function toggleFavorite(gameId) {
     updateFavoriteButton(gameId); // Update modal button if open
 }
 
-/** Updates the favorite button inside the modal/card. */
+/** Updates the favorite button inside the modal. */
 function updateFavoriteButton(gameId) {
     const btn = document.getElementById('favoriteBtn');
     if (!btn) return;
 
     const isFavorited = getFavorites().includes(gameId);
     
-    // FIX: Ensure onclick is correctly set if the element exists
     btn.onclick = (e) => { 
         toggleFavorite(gameId);
         if (e) e.stopPropagation();
@@ -101,33 +106,13 @@ function updateFavoriteButton(gameId) {
 
     btn.classList.toggle('favorited', isFavorited);
     
-    // Using a single SVG path for simplicity
+    // Star icon SVG
     const svgContent = `<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/></svg>`;
 
     btn.innerHTML = svgContent;
+    // Apply Tailwind classes for styling
     btn.querySelector('svg').classList.remove('text-slate-400', 'hover:text-amber-500', 'text-amber-500');
     btn.querySelector('svg').classList.add(isFavorited ? 'text-amber-500' : 'text-slate-400', isFavorited ? '' : 'hover:text-amber-500');
-}
-
-
-// ---------- Dark Mode System (remains the same) ----------
-
-function applyDarkMode(isDark) {
-    document.body.classList.toggle('light-mode', !isDark);
-    localStorage.setItem(DARK_MODE_KEY, isDark ? 'dark' : 'light');
-}
-
-function loadDarkMode() {
-    const preference = localStorage.getItem(DARK_MODE_KEY);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    const isDark = (preference === 'dark') || (preference === null && prefersDark);
-    applyDarkMode(isDark);
-}
-
-function toggleDarkMode() {
-    const isLight = document.body.classList.contains('light-mode');
-    applyDarkMode(isLight);
 }
 
 // ---------- UI / Rendering Functions ----------
@@ -141,9 +126,21 @@ function showMessage(title, content) {
     box.classList.remove('hidden');
 
     setTimeout(() => {
-        inner.classList.remove('scale-95', 'opacity-0');
-        inner.classList.add('scale-100', 'opacity-100');
+        // Simple transition logic for the alert box
+        const dialog = document.querySelector('#messageBox > div');
+        if (dialog) dialog.style.opacity = '1';
     }, 10);
+}
+
+function renderCategoryFilter() {
+    const select = document.getElementById('categoryFilter');
+    if (!select) return;
+
+    let options = '<option value="All">All Categories</option>';
+    DEFAULT_CATEGORIES.forEach(cat => {
+        options += `<option value="${cat}">${cat}</option>`;
+    });
+    select.innerHTML = options;
 }
 
 /** Renders the game list based on filters, categories, and sorting. */
@@ -151,11 +148,13 @@ function renderGameList() {
     const container = document.getElementById('gameListContainer');
     if (!container) return;
 
-    const filterText = document.getElementById('gameFilterInput').value.toLowerCase();
-    const categoryFilter = document.getElementById('categoryFilter').value;
-    const sortBy = document.getElementById('sortBy').value;
-    const isFavoritesTab = document.querySelector('.tab-button[data-tab="favoritesView"]').classList.contains('active');
-
+    const filterText = (document.getElementById('gameFilterInput') && document.getElementById('gameFilterInput').value || '').toLowerCase();
+    const categoryFilter = (document.getElementById('categoryFilter') && document.getElementById('categoryFilter').value) || 'All';
+    const sortBy = (document.getElementById('sortBy') && document.getElementById('sortBy').value) || 'popular';
+    
+    // Determine active tab to filter for favorites
+    const isFavoritesTab = document.querySelector('#tabFavorites').classList.contains('active');
+    
     let gamesArray = Object.values(getGamesObj());
     const favorites = getFavorites();
 
@@ -168,7 +167,7 @@ function renderGameList() {
         return true;
     });
 
-    // 2. Sort (remains the same)
+    // 2. Sort
     gamesArray.sort((a, b) => {
         const clicksA = stats.counts[a.id] || 0;
         const clicksB = stats.counts[b.id] || 0;
@@ -191,7 +190,7 @@ function renderGameList() {
             const imageSrc = game.image || PLACEHOLDER_IMG_URL;
 
             return `
-                <div id="game-card-${game.id}" class="game-card p-4 rounded-xl shadow-lg flex flex-col justify-between">
+                <div id="game-card-${game.id}" class="game-card p-4 rounded-xl shadow-lg flex flex-col justify-between relative">
                     
                     <div onclick="window.launchGame('${game.id}')" class="cursor-pointer">
                         <img src="${imageSrc}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG_URL}'" 
@@ -201,9 +200,9 @@ function renderGameList() {
 
                     <div class="flex justify-between items-center mt-2">
                         <p class="text-sm text-slate-400">
-                            <span class="font-bold text-xs">${game.category}</span> &bull; ${clickCount.toLocaleString()} plays
+                            <span class="font-bold text-xs">${game.category || 'Other'}</span> &bull; ${clickCount.toLocaleString()} plays
                         </p>
-                        <button onclick="window.toggleFavorite('${game.id}'); event.stopPropagation();" class="p-1" title="Toggle Favorite">
+                        <button onclick="window.toggleFavorite('${game.id}'); event.stopPropagation();" class="p-1 z-10" title="Toggle Favorite">
                             <svg class="w-5 h-5 fill-current ${isFavorited ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}" viewBox="0 0 24 24">
                                 <path d="M12 2l3.09 6.26l6.91 1.01l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25l1.18-6.88l-5-4.87l6.91-1.01L12 2z"/>
                             </svg>
@@ -244,13 +243,19 @@ function launchGame(gameId) {
     titleEl.textContent = game.name;
     updateFavoriteButton(gameId);
     
-    // FIX: Clear previous content before inserting new one
+    // Clear previous content before inserting new one
     embedContainer.innerHTML = '';
     
     if (game.type === 'link') {
         window.open(game.content, '_blank');
-        modal.classList.add('hidden');
-        showMessage('Game Launched', `The game '${game.name}' has been opened in a new tab. Embedding is blocked for this game.`);
+        modal.classList.add('hidden'); // Ensure modal is closed if it was open
+        showMessage('Game Launched', `The game '${game.name}' has been opened in a new tab.`);
+        
+        // Hide/disable open source link for external links
+        gameLinkEl.classList.add('opacity-50', 'cursor-not-allowed');
+        gameLinkEl.href = 'javascript:void(0)';
+        gameLinkEl.textContent = 'Opened in New Tab';
+        
     } else if (game.type === 'embed') {
         
         // Prepare link element for embed type (try to extract the src)
@@ -259,10 +264,11 @@ function launchGame(gameId) {
         gameLinkEl.textContent = 'View Embed Source Link';
         gameLinkEl.classList.remove('opacity-50', 'cursor-not-allowed');
 
-        // FIX: Wrap the embed content in a full-size div for proper sizing
+        // FIX: Wrap the embed content in a full-size div for proper sizing and inject
+        // This is the Custom Player Logic
         embedContainer.innerHTML = `<div class="w-full h-full">${game.content}</div>`;
         
-        // FIX: Find iframes and ensure they have full height/width
+        // FIX: Find any iframe inside the content and explicitly set full size
         const iframe = embedContainer.querySelector('iframe');
         if(iframe) {
             iframe.style.width = '100%';
@@ -283,8 +289,7 @@ function closeGame() {
     modal.classList.add('hidden');
 }
 
-
-// ---------- Admin Functions (remains the same) ----------
+// ---------- Admin Functions ----------
 
 function requireAdmin() {
     return localStorage.getItem('adminLoggedIn') === 'true';
@@ -337,16 +342,6 @@ function deleteGame(id) {
     }
 }
 
-function clearGameForm() {
-    const form = document.getElementById('gameForm');
-    if (form) form.reset();
-
-    document.getElementById('editGameSelector').value = '';
-    document.getElementById('adminMessage').textContent = 'Creating a new game.';
-    document.getElementById('gameTypeLink').checked = true;
-    toggleAdminContentType();
-}
-
 function renderStatsSummary() {
     const container = document.getElementById('statsSummary');
     if (!container || !requireAdmin()) return;
@@ -364,6 +359,7 @@ function renderStatsSummary() {
 }
 
 function renderRecentClicks() {
+    // ... (logic remains the same, assuming it was correct in the original)
     const container = document.getElementById('recentClicksList');
     if (!container || !requireAdmin()) return;
 
@@ -387,6 +383,16 @@ function renderRecentClicks() {
     container.innerHTML = listHtml;
 }
 
+function clearGameForm() {
+    const form = document.getElementById('gameForm');
+    if (form) form.reset();
+
+    document.getElementById('editGameSelector').value = '';
+    document.getElementById('adminMessage').textContent = 'Creating a new game.';
+    document.getElementById('gameTypeLink').checked = true;
+    toggleAdminContentType();
+}
+
 function resetStats() {
     stats = { counts: {}, recent: [] };
     setStatsObj(stats);
@@ -401,23 +407,10 @@ function toggleAdminContentType() {
 
 // ---------- Initialization ----------
 
-function renderCategoryFilter() {
-    const select = document.getElementById('categoryFilter');
-    if (!select) return;
-
-    let options = '<option value="All">All Categories</option>';
-    DEFAULT_CATEGORIES.forEach(cat => {
-        options += `<option value="${cat}">${cat}</option>`;
-    });
-    select.innerHTML = options;
-}
-
 function loadAll() {
     DATA = loadData();
     allGames = DATA.games || {};
     stats = DATA.stats || { counts: {}, recent: [] };
-
-    loadDarkMode();
 
     const loadingMessageEl = document.getElementById('loadingMessage');
     if (loadingMessageEl) loadingMessageEl.classList.add('hidden');
@@ -425,13 +418,13 @@ function loadAll() {
     renderCategoryFilter();
     renderGameList();
     renderAdminOptions();
+    // No need to render stats here, they are rendered on admin tab activation
 }
 
 window.loadAll = loadAll;
 window.renderGameList = renderGameList;
 window.launchGame = launchGame;
 window.closeGame = closeGame;
-window.toggleDarkMode = toggleDarkMode;
 window.toggleFavorite = toggleFavorite;
 window.showMessage = showMessage;
 window.requireAdmin = requireAdmin;
@@ -443,5 +436,5 @@ window.deleteGame = deleteGame;
 window.clearGameForm = clearGameForm;
 window.resetStats = resetStats;
 window.toggleAdminContentType = toggleAdminContentType;
-window.ADMIN_PASSWORD = ADMIN_PASSWORD;
+window.getAdminPassword = getAdminPassword;
 window.getGamesObj = getGamesObj;
