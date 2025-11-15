@@ -22,7 +22,7 @@
                 <button id="tabFavorites" data-tab="favoritesView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
                     Favorites
                 </button>
-                <button id="tabAdmin" data-tab="adminView" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
+                <button id="tabAdmin" onclick="window.location.href = 'admin.html';" class="tab-button px-4 py-2 transition duration-150 ease-in-out hover:text-indigo-300">
                     Admin Panel
                 </button>
             </div>
@@ -48,143 +48,31 @@
             <div id="gameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 </div>
         </div>
+        
         <div id="favoritesView" class="tab-content hidden">
-             <div id="favoritesListInfo" class="text-slate-400 text-center mb-4">Viewing Favorites:</div>
+             <div class="text-slate-400 text-center mb-4">Your favorite games:</div>
              <div id="gameListContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                  </div>
         </div>
-
-
-        <div id="adminView" class="tab-content hidden">
-            <div id="loginArea" class="max-w-md mx-auto bg-slate-800 p-6 rounded-xl shadow-2xl">
-                <h2 class="text-xl font-semibold text-slate-100 mb-4">Admin Login</h2>
-                <input id="adminPassword" type="password" placeholder="Admin Password"
-                       class="form-input w-full p-3 mb-4 rounded-lg">
-                <button id="adminLoginBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition duration-150">Login</button>
-                <p id="loginMessage" class="text-center mt-4 text-red-400"></p>
-            </div>
-
-            <div id="adminPanel" class="max-w-6xl mx-auto hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
-                    <div class="lg:col-span-2 bg-slate-800 p-6 rounded-xl shadow-2xl">
-                        <h2 class="text-2xl font-bold text-indigo-400 mb-4">Game Management</h2>
-                        
-                        <div class="mb-4">
-                            <label for="editGameSelector" class="block text-slate-300 mb-2">Select Game to Edit/Delete:</label>
-                            <select id="editGameSelector" class="form-input w-full p-3 rounded-lg">
-                                <option value="">-- Add New Game --</option>
-                            </select>
-                        </div>
-
-                        <form id="gameForm" class="space-y-4">
-                            <p id="adminMessage" class="text-yellow-400 font-semibold">Creating a new game.</p>
-                            
-                            <div class="grid md:grid-cols-3 gap-4">
-                                <div>
-                                    <label for="gameIdInput" class="block text-slate-300 mb-1">Game ID (slug, required)</label>
-                                    <input type="text" id="gameIdInput" required placeholder="e.g. my-awesome-game" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, or hyphens only."
-                                           class="form-input w-full p-3 rounded-lg" />
-                                </div>
-                                <div>
-                                    <label for="gameNameInput" class="block text-slate-300 mb-1">Game Name (required)</label>
-                                    <input type="text" id="gameNameInput" required placeholder="My Awesome Game"
-                                           class="form-input w-full p-3 rounded-lg" />
-                                </div>
-                                <div>
-                                    <label for="gameCategoryInput" class="block text-slate-300 mb-1">Category</label>
-                                    <select id="gameCategoryInput" class="form-input w-full p-3 rounded-lg">
-                                        </select>
-                                </div>
-                            </div>
-                            
-                            <label for="gameImageInput" class="block text-slate-300 mb-1">Image Address (URL)</label>
-                            <input type="url" id="gameImageInput" placeholder="https://my.site/icon.png (optional, uses placeholder if empty)"
-                                   class="form-input w-full p-3 rounded-lg" />
-
-                            <h3 class="text-lg font-semibold text-slate-300 pt-2">Game Content Type</h3>
-                            <div class="flex space-x-4">
-                                <label class="flex items-center">
-                                    <input type="radio" name="gameContentType" value="link" id="gameTypeLink" checked onclick="window.toggleAdminContentType()"
-                                           class="form-radio h-4 w-4 text-indigo-600">
-                                    <span class="ml-2 text-slate-300">External Link (New Tab)</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio" name="gameContentType" value="embed" id="gameTypeEmbed" onclick="window.toggleAdminContentType()"
-                                           class="form-radio h-4 w-4 text-indigo-600">
-                                    <span class="ml-2 text-slate-300">Embed Code (Modal Player)</span>
-                                </label>
-                            </div>
-
-                            <div id="linkInputGroup">
-                                <label for="gameLinkInput" class="block text-slate-300 mb-1">Game URL (required for link type)</label>
-                                <input type="url" id="gameLinkInput" placeholder="https://myserver.com/my-game"
-                                       class="form-input w-full p-3 rounded-lg" />
-                            </div>
-
-                            <div id="embedInputGroup" class="hidden">
-                                <label for="gameEmbedCode" class="block text-slate-300 mb-1">Embed Code (e.g., full iframe tag)</label>
-                                <textarea id="gameEmbedCode" rows="5" placeholder="<iframe src='...' width='100%' height='100%'></iframe>"
-                                          class="form-input w-full p-3 rounded-lg"></textarea>
-                            </div>
-                            
-                            <div class="flex items-center pt-2">
-                                <input type="checkbox" id="gameVisibleInput" checked
-                                       class="h-4 w-4 text-indigo-600 bg-slate-700 border-slate-600 rounded focus:ring-indigo-500">
-                                <label for="gameVisibleInput" class="ml-2 text-slate-300">Visible on Game List</label>
-                            </div>
-
-                            <div class="flex space-x-4 pt-4">
-                                <button type="submit" id="saveGameBtn" class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-150">Save Game</button>
-                                <button type="button" id="deleteGameBtn" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-150">Delete Selected</button>
-                                <button type="button" class="flex-1 py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-lg transition duration-150" onclick="window.clearGameForm()">Clear Form</button>
-                            </div>
-                            <button type="button" id="adminLogoutBtn" class="w-full mt-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-lg transition duration-150">Logout</button>
-                        </form>
-                    </div>
-
-                    <div class="lg:col-span-1 space-y-6">
-                        <div id="statsSummary" class="bg-slate-800 p-6 rounded-xl shadow-2xl">
-                            </div>
-                        <div class="bg-slate-800 p-6 rounded-xl shadow-2xl">
-                            <h3 class="text-xl font-semibold text-indigo-300 mb-4">Recent Clicks (Last 10)</h3>
-                            <div id="recentClicksList" class="overflow-y-auto max-h-48">
-                                </div>
-                        </div>
-                        <div class="bg-slate-800 p-6 rounded-xl shadow-2xl">
-                            <button id="resetStatsBtn" class="w-full py-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg transition duration-150">Reset All Stats</button>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-        
     </div>
     
-    <div id="gameModal" class="hidden fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300">
+    <div id="gameModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300">
         <div id="gameModalInner" class="w-11/12 h-5/6 rounded-xl shadow-2xl flex flex-col p-4 bg-slate-800">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
                 <h2 id="modalGameTitle" class="text-2xl font-bold text-indigo-400 truncate"></h2>
                 <div class="flex space-x-3 items-center">
-                    <button id="favoriteBtn" class="p-1" title="Toggle Favorite">
-                        </button>
-                    <a id="modalGameLink" href="#" target="_blank" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition duration-150">
-                        Open Source Link
-                    </a>
                     <button onclick="window.closeGame()" class="py-1 px-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition duration-150">
-                        Close
+                        Close Game
                     </button>
                 </div>
             </div>
             <div id="gameEmbedContainer" class="flex-grow rounded-lg overflow-hidden" style="width: 100%; height: 100%;"></div>
-            <p class="text-xs text-slate-500 mt-2">Note: This game is loaded via embed code. Not all content can be embedded.</p>
         </div>
     </div>
 
 
     <div id="messageBox" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
-        <div class="bg-slate-700 p-6 rounded-lg shadow-xl max-w-sm w-full transition duration-300" style="opacity: 0;">
+        <div class="bg-slate-700 p-6 rounded-lg shadow-xl max-w-sm w-full">
             <h4 id="messageTitle" class="text-lg font-bold text-slate-100 mb-2"></h4>
             <p id="messageContent" class="text-slate-300 mb-4"></p>
             <button id="messageCloseBtn" class="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">
@@ -208,169 +96,32 @@
             document.getElementById(targetId).classList.remove('hidden');
             document.querySelector(`.tab-button[data-tab="${targetId}"]`).classList.add('active');
 
-            // Special logic for Admin tab
-            if (targetId === 'adminView') {
-                if (window.requireAdmin()) {
-                    document.getElementById('loginArea').classList.add('hidden');
-                    document.getElementById('adminPanel').classList.remove('hidden');
-                    window.renderAdminOptions();
-                    window.renderStatsSummary();
-                    window.renderRecentClicks();
-                } else {
-                    document.getElementById('loginArea').classList.remove('hidden');
-                    document.getElementById('adminPanel').classList.add('hidden');
-                }
-            }
-            
-            // Re-render game list if switching to Game List or Favorites
-            if (targetId === 'gameListView' || targetId === 'favoritesView') {
-                 window.renderGameList();
-            }
+            // Re-render game list for filtering favorites
+            window.renderGameList();
         }
-
-        // --- Event Listeners ---
 
         document.addEventListener('DOMContentLoaded', () => {
             window.loadAll();
             
-            // Initial tab setup
-            switchTab('gameListView');
-
             // Set up Tab Switching
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.onclick = () => switchTab(btn.dataset.tab);
-            });
-
+            document.getElementById('tabGameList').onclick = () => switchTab('gameListView');
+            document.getElementById('tabFavorites').onclick = () => switchTab('favoritesView');
+            
             // Set up Message Box Close
             document.getElementById('messageCloseBtn').onclick = () => {
-                const dialog = document.querySelector('#messageBox > div');
-                if (dialog) dialog.style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('messageBox').classList.add('hidden');
-                }, 300);
+                document.getElementById('messageBox').classList.add('hidden');
             };
 
-            // --- Admin Listeners ---
-            
-            // Admin Login
-            document.getElementById('adminLoginBtn').onclick = () => {
-                const password = document.getElementById('adminPassword').value;
-                const loginMessage = document.getElementById('loginMessage');
-                if (password === window.getAdminPassword()) {
-                    localStorage.setItem('adminLoggedIn', 'true');
-                    loginMessage.textContent = 'Login successful!';
-                    document.getElementById('adminPassword').value = '';
-                    setTimeout(() => switchTab('adminView'), 500);
-                } else {
-                    loginMessage.textContent = 'Invalid password.';
-                }
-            };
-            
-            // Admin Logout
-            document.getElementById('adminLogoutBtn').onclick = () => {
-                localStorage.removeItem('adminLoggedIn');
-                switchTab('gameListView');
-                window.showMessage('Logged Out', 'You have been logged out of the Admin Panel.');
-            };
-
-            // Admin Game Selector Change
-            document.getElementById('editGameSelector').onchange = (e) => {
-                const id = e.target.value;
-                const games = window.getGamesObj();
-                if (id && games[id]) {
-                    const g = games[id];
-                    document.getElementById('gameIdInput').value = g.id;
-                    document.getElementById('gameNameInput').value = g.name;
-                    document.getElementById('gameImageInput').value = g.image || '';
-                    document.getElementById('gameCategoryInput').value = g.category || 'Other';
-                    document.getElementById('gameVisibleInput').checked = g.visible !== false;
-                    document.getElementById('adminMessage').textContent = 'Editing existing game.';
-                    
-                    const typeIsLink = g.type === 'link';
-                    document.getElementById('gameTypeLink').checked = typeIsLink;
-                    document.getElementById('gameTypeEmbed').checked = !typeIsLink;
-                    window.toggleAdminContentType();
-
-                    if (typeIsLink) {
-                        document.getElementById('gameLinkInput').value = g.content || '';
-                        document.getElementById('gameEmbedCode').value = '';
-                    } else {
-                        document.getElementById('gameLinkInput').value = '';
-                        document.getElementById('gameEmbedCode').value = g.content || '';
-                    }
-                    
-                } else {
-                    window.clearGameForm();
+            // Set up Modal Close
+            document.getElementById('gameModal').onclick = (e) => {
+                // If clicked outside the modal inner content, close the modal
+                if (e.target.id === 'gameModal') {
+                    window.closeGame();
                 }
             };
 
-            // Admin Form Submission (Save/Update)
-            document.getElementById('gameForm').onsubmit = (e) => {
-                e.preventDefault();
-                if (!window.requireAdmin()) {
-                    window.showMessage('Error', 'Unauthorized action.');
-                    return;
-                }
-
-                const gameId = document.getElementById('gameIdInput').value.trim();
-                const gameName = document.getElementById('gameNameInput').value.trim();
-                const gameImage = document.getElementById('gameImageInput').value.trim();
-                const gameCategory = document.getElementById('gameCategoryInput').value;
-                const isVisible = document.getElementById('gameVisibleInput').checked;
-                const contentType = document.querySelector('input[name="gameContentType"]:checked').value;
-                
-                let gameContent = '';
-                if (contentType === 'link') {
-                    gameContent = document.getElementById('gameLinkInput').value.trim();
-                } else {
-                    gameContent = document.getElementById('gameEmbedCode').value.trim();
-                }
-
-                if (!gameId || !gameName || !gameContent) {
-                    window.showMessage('Validation Error', 'Game ID, Name, and Content (Link/Embed) are required.');
-                    return;
-                }
-
-                const newGame = {
-                    id: gameId,
-                    name: gameName,
-                    image: gameImage,
-                    category: gameCategory,
-                    type: contentType,
-                    content: gameContent,
-                    visible: isVisible
-                };
-
-                window.upsertGame(newGame);
-                window.renderAdminOptions();
-                window.renderGameList();
-                window.clearGameForm();
-            };
-
-            // Admin Delete Game Button
-            document.getElementById('deleteGameBtn').onclick = () => {
-                const gameId = document.getElementById('gameIdInput').value.trim();
-                if (!gameId || !window.getGamesObj()[gameId]) {
-                    window.showMessage('Error', 'No game selected for deletion.');
-                    return;
-                }
-                if (confirm(`Are you sure you want to delete game ID: ${gameId}?`)) {
-                    window.deleteGame(gameId);
-                    window.clearGameForm();
-                    window.renderAdminOptions();
-                    window.renderGameList();
-                    window.showMessage('Success', `Game ID: ${gameId} deleted.`);
-                }
-            };
-
-            // Admin Reset Stats Button
-            document.getElementById('resetStatsBtn').onclick = () => {
-                if (confirm('Are you sure you want to reset ALL game click statistics? This cannot be undone.')) {
-                    window.resetStats();
-                    window.renderStatsSummary();
-                    window.renderGameList();
-                }
-            };
+            // Initial view
+            switchTab('gameListView');
         });
     </script>
 </body>
