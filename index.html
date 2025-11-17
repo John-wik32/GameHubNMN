@@ -1,1 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unblocked Game Hub</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Google Font (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/lucide.min.js"></script>
+    <!-- Load Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100">
 
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm">
+        <div class="loader"></div>
+        <p class="mt-4 text-lg font-semibold text-white">Connecting to Hub...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
+        <div class="container flex items-center justify-between h-16 px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+            <!-- Brand -->
+            <div class="flex items-center gap-2">
+                <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-accent">
+                    <i data-lucide="gamepad-2" class="w-5 h-5 text-white"></i>
+                </div>
+                <span class="text-xl font-bold text-gray-900">Unblocked Game Hub</span>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="hidden md:flex md:items-center md:gap-2" id="desktopNav">
+                <!-- Nav buttons will be injected here -->
+            </nav>
+
+            <!-- Auth Status -->
+            <div class="flex items-center gap-3">
+                 <div id="authStatus" class="flex items-center gap-2 p-2 text-sm text-gray-600 bg-gray-100 rounded-lg">
+                    <span class="font-medium">Status:</span>
+                    <span id="authMessage">Initializing...</span>
+                 </div>
+                 <button id="mobileMenuButton" class="p-2 rounded-lg md:hidden hover:bg-gray-100">
+                    <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
+                 </button>
+            </div>
+        </div>
+        
+        <!-- Mobile Navigation Menu -->
+        <div id="mobileNav" class="hidden border-t border-gray-200 md:hidden">
+            <div class="flex flex-col p-4 space-y-2">
+                <!-- Mobile nav buttons will be injected here -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container p-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        
+        <!-- Home Page -->
+        <section id="page-home" class="page">
+            <div class="p-8 bg-white border border-gray-200 rounded-xl shadow-accent-light">
+                <h1 class="text-4xl font-bold text-gray-900">Welcome to the Hub!</h1>
+                <p id="homeDesc" class="mt-3 text-lg text-gray-600">Loading description...</p>
+            </div>
+            
+            <div class="mt-6">
+                 <h2 class="text-2xl font-semibold text-gray-800">Recently Played</h2>
+                 <div id="recentlyPlayedGrid" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-3 lg:grid-cols-5">
+                    <!-- Recently played games will be injected here -->
+                 </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Game Section Pages -->
+        <!-- A container for all game sections -->
+        <div id="gameSectionsContainer">
+            <!-- Dynamic pages will be injected here -->
+            <!-- Example:
+            <section id="page-games" class="page" style="display:none;">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-3xl font-bold text-gray-900">Games</h2>
+                     // Search and sort
+                </div>
+                <div id="grid-games" class="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    // Game cards
+                </div>
+            </section>
+            -->
+        </div>
+
+        <!-- Admin Page -->
+        <section id="page-admin" class="page" style="display:none;">
+            <div id="adminLocker" class="hidden">
+                <!-- This content is shown to non-admins -->
+                <div id="adminClaim" class="hidden p-6 text-center bg-white border border-yellow-300 rounded-lg shadow-lg">
+                    <i data-lucide="lock" class="w-12 h-12 mx-auto text-yellow-500"></i>
+                    <h2 class="mt-4 text-2xl font-semibold text-gray-800">Admin Role Available</h2>
+                    <p class="mt-2 text-gray-600">No admin has been set for this site. If you are the owner, you can claim this role.</p>
+                    <button id="claimAdminBtn" class="inline-flex items-center gap-2 px-6 py-3 mt-6 font-semibold text-white rounded-lg bg-accent hover:opacity-90">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        Claim Admin Role
+                    </button>
+                </div>
+                <!-- This content is shown if admin is set and user is not admin -->
+                 <div id="adminDenied" class="hidden p-6 text-center bg-white border border-red-300 rounded-lg shadow-lg">
+                    <i data-lucide="shield-off" class="w-12 h-12 mx-auto text-red-500"></i>
+                    <h2 class="mt-4 text-2xl font-semibold text-gray-800">Access Denied</h2>
+                    <p class="mt-2 text-gray-600">You are not authorized to view the admin panel.</p>
+                    <p class="mt-1 text-sm text-gray-500">Your User ID: <code id="adminDeniedUserId" class="px-1 py-0.5 bg-gray-200 rounded"></code></p>
+                </div>
+            </div>
+
+            <!-- This content is shown to admins -->
+            <div id="adminPanel" class="hidden space-y-8">
+                <h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
+
+                <!-- Add / Edit Game Form -->
+                <div class="p-6 bg-white rounded-lg shadow-md">
+                    <h2 id="formTitle" class="text-2xl font-semibold text-gray-800">Add New Game</h2>
+                    <form id="gameForm" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
+                        <input id="gameIdInput" type="hidden"> <!-- For editing -->
+                        <!-- Title -->
+                        <div class="md:col-span-2">
+                            <label for="aTitle" class="block text-sm font-medium text-gray-700">Title</label>
+                            <input type="text" id="aTitle" placeholder="Game Title" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" required>
+                        </div>
+                        <!-- Section -->
+                        <div>
+                            <label for="aSection" class="block text-sm font-medium text-gray-700">Section</label>
+                            <select id="aSection" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" required>
+                                <!-- Sections loaded by JS -->
+                            </select>
+                        </div>
+                        <!-- Description -->
+                        <div>
+                            <label for="aDesc" class="block text-sm font-medium text-gray-700">Short Description</label>
+                            <input type="text" id="aDesc" placeholder="A short description" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
+                        </div>
+                        <!-- Thumbnail URL -->
+                        <div class="md:col-span-2">
+                            <label for="aThumbUrl" class="block text-sm font-medium text-gray-700">Thumbnail URL</label>
+                            <input type="url" id="aThumbUrl" placeholder="https://example.com/image.png" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
+                        </div>
+                        <!-- Embed Code -->
+                        <div class="md:col-span-2">
+                            <label for="aEmbed" class="block text-sm font-medium text-gray-700">Embed Code (e.g., iframe)</label>
+                            <textarea id="aEmbed" rows="4" placeholder="<iframe src='...'></iframe>" class="block w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"></textarea>
+                        </div>
+                        <!-- OR Game URL -->
+                        <div class="md:col-span-2">
+                             <label for="aUrl" class="block text-sm font-medium text-gray-700">OR Direct Game URL (takes priority over embed)</label>
+                            <input type="url" id="aUrl" placeholder="https://example.com/game" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
+                        </div>
+                        <!-- Form Buttons -->
+                        <div class="flex items-center gap-4 md:col-span-2">
+                            <button type="submit" id="addGameBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                <i data-lucide="plus" class="w-5 h-5"></i>
+                                <span>Add Game</span>
+                            </button>
+                            <button type="button" id="clearFormBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Manage Games List -->
+                <div class="p-6 bg-white rounded-lg shadow-md">
+                     <h2 class="text-2xl font-semibold text-gray-800">Manage Existing Games</h2>
+                     <div id="adminList" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2 lg:grid-cols-3">
+                        <!-- Admin game cards injected here -->
+                     </div>
+                </div>
+
+                <!-- Site Settings -->
+                <div class="p-6 bg-white rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold text-gray-800">Site Settings</h2>
+                    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+                        <!-- Homepage Description -->
+                        <div>
+                            <label for="homeDescInput" class="block text-sm font-medium text-gray-700">Homepage Description</label>
+                            <textarea id="homeDescInput" rows="3" class="block w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"></textarea>
+                            <button id="saveHomeDesc" class="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                <i data-lucide="save" class="w-4 h-4"></i> Save Description
+                            </button>
+                        </div>
+                        <!-- Theme Color -->
+                        <div>
+                            <label for="colorPicker" class="block text-sm font-medium text-gray-700">Theme Primary Color</label>
+                            <div class="flex items-center gap-2 mt-1">
+                                <input id="colorPicker" type="color" value="#3b82f6" class="w-12 h-10 p-1 border border-gray-300 rounded-md">
+                                <button id="saveColorBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Color
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Manage Sections -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Manage Sections</label>
+                            <div class="flex items-center gap-2 mt-1">
+                                <input type="text" id="newSectionName" placeholder="New section name" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
+                                <button id="addSectionBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white whitespace-nowrap rounded-md bg-accent hover:opacity-90">
+                                     <i data-lucide="plus" class="w-5 h-5"></i> Add
+                                </button>
+                            </div>
+                            <div id="sectionsList" class="mt-4 space-y-2">
+                                <!-- Section list injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="p-6 bg-white rounded-lg shadow-md">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-semibold text-gray-800">Statistics</h2>
+                         <button id="resetStatsBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-md hover:bg-red-700">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> Reset All Stats
+                        </button>
+                    </div>
+                    <div id="statsSummary" class="mt-4 space-y-4">
+                        <!-- Stats summary injected here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-6 mt-12 border-t border-gray-200 bg-white">
+        <div class="container px-4 mx-auto text-sm text-center text-gray-500 max-w-7xl sm:px-6 lg:px-8">
+            Powered by Firebase & Tailwind CSS. Refactored from Apps Script.
+        </div>
+    </footer>
+
+    <!-- Custom Modal for Alerts -->
+    <div id="alertModal" class="fixed inset-0 z-50 flex items-center justify-centerhidden" style="display: none;">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-50" id="alertBackdrop"></div>
+        <div class="z-10 w-full max-w-md p-6 mx-4 bg-white rounded-lg shadow-xl">
+            <div class="flex items-start">
+                <div id="alertIcon" class="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-blue-100">
+                    <i data-lucide="info" class="w-6 h-6 text-blue-600"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 id="alertTitle" class="text-lg font-semibold text-gray-900">Notification</h3>
+                    <p id="alertMessage" class="mt-2 text-sm text-gray-600">This is an alert message.</p>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button id="alertOkBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">OK</button>
+                <button id="alertConfirmBtn" class="px-4 py-2 ml-3 font-semibold text-white rounded-md bg-accent hover:opacity-90">Confirm</button>
+                <button id="alertCancelBtn" class="px-4 py-2 ml-3 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Script -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
