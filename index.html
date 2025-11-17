@@ -1,248 +1,436 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> <!-- 'dark' class will be added here by JS -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unblocked Game Hub</title>
+    <!-- Favicon (will be changed by panic button) -->
+    <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!--
+    CRITICAL: This config script MUST come after loading Tailwind
+    It tells Tailwind how to handle dark mode.
+    -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // This enables 'dark:' classes
+            theme: {
+                extend: {
+                    // You can extend your theme here if needed
+                }
+            }
+        }
+    </script>
     <!-- Load Google Font (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Load Lucide Icons -->
-    <script src="https://unpkg.com/lucide-react@latest/dist/lucide.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <!-- Load Custom Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
 
     <!-- Loading Modal -->
     <div id="loadingModal" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm">
         <div class="loader"></div>
         <p class="mt-4 text-lg font-semibold text-white">Connecting to Hub...</p>
     </div>
-
-    <!-- Header -->
-    <header class="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
-        <div class="container flex items-center justify-between h-16 px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-            <!-- Brand -->
-            <div class="flex items-center gap-2">
-                <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-accent">
-                    <i data-lucide="gamepad-2" class="w-5 h-5 text-white"></i>
+    
+    <!-- App Wrapper (will be hidden on panic) -->
+    <div id="appWrapper">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+            <div class="container flex items-center justify-between h-16 px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <!-- Brand -->
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-accent">
+                        <i data-lucide="gamepad-2" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900 dark:text-white">Unblocked Game Hub</span>
                 </div>
-                <span class="text-xl font-bold text-gray-900">Unblocked Game Hub</span>
+                
+                <!-- Navigation -->
+                <nav class="hidden md:flex md:items-center md:gap-2" id="desktopNav">
+                    <!-- Nav buttons will be injected here -->
+                </nav>
+    
+                <!-- Auth & Theme Toggle -->
+                <div class="flex items-center gap-3">
+                     <div id="authStatus" class="flex items-center gap-2 p-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <span class="font-medium">Status:</span>
+                        <span id="authMessage">Initializing...</span>
+                     </div>
+                     <!-- NEW: Theme Toggle Button -->
+                     <button id="themeToggle" class="p-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i data-lucide="sun" class="w-6 h-6"></i> <!-- Icon will be changed by JS -->
+                     </button>
+                     <!-- NEW: User Profile Button -->
+                     <button id="userProfileButton" title="My Profile" class="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <span id="userProfileAvatar" class="text-xl">🎮</span>
+                        <span id="userProfileName" class="hidden text-sm font-semibold sm:block">Player</span>
+                     </button>
+                     <!-- NEW: Random Game Button -->
+                     <button id="randomGameBtn" title="Play a random game" class="p-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i data-lucide="dice-5" class="w-6 h-6"></i>
+                     </button>
+                     <button id="mobileMenuButton" class="p-2 rounded-lg md:hidden text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                     </button>
+                </div>
             </div>
             
-            <!-- Navigation -->
-            <nav class="hidden md:flex md:items-center md:gap-2" id="desktopNav">
-                <!-- Nav buttons will be injected here -->
-            </nav>
-
-            <!-- Auth Status -->
-            <div class="flex items-center gap-3">
-                 <div id="authStatus" class="flex items-center gap-2 p-2 text-sm text-gray-600 bg-gray-100 rounded-lg">
-                    <span class="font-medium">Status:</span>
-                    <span id="authMessage">Initializing...</span>
-                 </div>
-                 <button id="mobileMenuButton" class="p-2 rounded-lg md:hidden hover:bg-gray-100">
-                    <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
-                 </button>
+            <!-- Mobile Navigation Menu -->
+            <div id="mobileNav" class="hidden border-t border-gray-200 dark:border-gray-700 md:hidden bg-white dark:bg-gray-800">
+                <div class="flex flex-col p-4 space-y-2">
+                    <!-- Mobile nav buttons will be injected here -->
+                </div>
             </div>
-        </div>
-        
-        <!-- Mobile Navigation Menu -->
-        <div id="mobileNav" class="hidden border-t border-gray-200 md:hidden">
-            <div class="flex flex-col p-4 space-y-2">
-                <!-- Mobile nav buttons will be injected here -->
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container p-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-        
-        <!-- Home Page -->
-        <section id="page-home" class="page">
-            <div class="p-8 bg-white border border-gray-200 rounded-xl shadow-accent-light">
-                <h1 class="text-4xl font-bold text-gray-900">Welcome to the Hub!</h1>
-                <p id="homeDesc" class="mt-3 text-lg text-gray-600">Loading description...</p>
-            </div>
+        </header>
+    
+        <!-- Main Content -->
+        <main class="container p-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
             
-            <div class="mt-6">
-                 <h2 class="text-2xl font-semibold text-gray-800">Recently Played</h2>
-                 <div id="recentlyPlayedGrid" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-3 lg:grid-cols-5">
-                    <!-- Recently played games will be injected here -->
-                 </div>
-            </div>
-        </section>
-
-        <!-- Dynamic Game Section Pages -->
-        <!-- A container for all game sections -->
-        <div id="gameSectionsContainer">
-            <!-- Dynamic pages will be injected here -->
-            <!-- Example:
-            <section id="page-games" class="page" style="display:none;">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-3xl font-bold text-gray-900">Games</h2>
-                     // Search and sort
+            <!-- Home Page -->
+            <section id="page-home" class="page">
+                <div class="p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-accent-light">
+                    <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Welcome to the Hub!</h1>
+                    <p id="homeDesc" class="mt-3 text-lg text-gray-600 dark:text-gray-300">Loading description...</p>
                 </div>
-                <div id="grid-games" class="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    // Game cards
-                </div>
-            </section>
-            -->
-        </div>
-
-        <!-- Admin Page -->
-        <section id="page-admin" class="page" style="display:none;">
-            <!-- This content is shown to admins -->
-            <div id="adminPanel" class="space-y-8">
-                <h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
-
-                <!-- Add / Edit Game Form -->
-                <div class="p-6 bg-white rounded-lg shadow-md">
-                    <h2 id="formTitle" class="text-2xl font-semibold text-gray-800">Add New Game</h2>
-                    <form id="gameForm" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
-                        <input id="gameIdInput" type="hidden"> <!-- For editing -->
-                        <!-- Title -->
-                        <div class="md:col-span-2">
-                            <label for="aTitle" class="block text-sm font-medium text-gray-700">Title</label>
-                            <input type="text" id="aTitle" placeholder="Game Title" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" required>
-                        </div>
-                        <!-- Section -->
-                        <div>
-                            <label for="aSection" class="block text-sm font-medium text-gray-700">Section</label>
-                            <select id="aSection" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" required>
-                                <!-- Sections loaded by JS -->
-                            </select>
-                        </div>
-                        <!-- Description -->
-                        <div>
-                            <label for="aDesc" class="block text-sm font-medium text-gray-700">Short Description</label>
-                            <input type="text" id="aDesc" placeholder="A short description" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
-                        </div>
-                        <!-- Thumbnail URL -->
-                        <div class="md:col-span-2">
-                            <label for="aThumbUrl" class="block text-sm font-medium text-gray-700">Thumbnail URL</label>
-                            <input type="url" id="aThumbUrl" placeholder="https://example.com/image.png" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
-                        </div>
-                        <!-- Embed Code -->
-                        <div class="md:col-span-2">
-                            <label for="aEmbed" class="block text-sm font-medium text-gray-700">Embed Code (e.g., iframe)</label>
-                            <textarea id="aEmbed" rows="4" placeholder="<iframe src='...'></iframe>" class="block w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"></textarea>
-                        </div>
-                        <!-- OR Game URL -->
-                        <div class="md:col-span-2">
-                             <label for="aUrl" class="block text-sm font-medium text-gray-700">OR Direct Game URL (takes priority over embed)</label>
-                            <input type="url" id="aUrl" placeholder="https://example.com/game" class="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
-                        </div>
-                        <!-- Form Buttons -->
-                        <div class="flex items-center gap-4 md:col-span-2">
-                            <button type="submit" id="addGameBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">
-                                <i data-lucide="plus" class="w-5 h-5"></i>
-                                <span>Add Game</span>
-                            </button>
-                            <button type="button" id="clearFormBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                                <i data-lucide="x" class="w-5 h-5"></i>
-                                <span>Clear</span>
-                            </button>
-                        </div>
-                    </form>
+                
+                <!-- NEW: Featured Game Section -->
+                <div id="featuredGameContainer" class="mt-8">
+                    <!-- Featured game will be injected here -->
                 </div>
 
-                <!-- Manage Games List -->
-                <div class="p-6 bg-white rounded-lg shadow-md">
-                     <h2 class="text-2xl font-semibold text-gray-800">Manage Existing Games</h2>
-                     <div id="adminList" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2 lg:grid-cols-3">
-                        <!-- Admin game cards injected here -->
+                <div class="mt-8"> <!-- Added margin-top -->
+                     <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Recently Played</h2>
+                     <div id="recentlyPlayedGrid" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-3 lg:grid-cols-5">
+                        <!-- Recently played games will be injected here -->
                      </div>
                 </div>
+            </section>
+    
+            <!-- NEW: Favorites Page -->
+            <section id="page-favorites" class="page" style="display:none;">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white">My Favorites</h2>
+                <div id="favoritesSearchSortContainer" class="mt-4">
+                    <!-- Search/sort bar will be injected here -->
+                </div>
+                <div id="favoritesGrid" class="grid grid-cols-1 gap-6 mt-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    <!-- Favorite games will be injected here -->
+                </div>
+            </section>
+    
+            <!-- Dynamic Game Section Pages -->
+            <!-- A container for all game sections -->
+            <div id="gameSectionsContainer">
+                <!-- Dynamic pages will be injected here -->
+            </div>
 
-                <!-- Site Settings -->
-                <div class="p-6 bg-white rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold text-gray-800">Site Settings</h2>
-                    <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
-                        <!-- Homepage Description -->
-                        <div>
-                            <label for="homeDescInput" class="block text-sm font-medium text-gray-700">Homepage Description</label>
-                            <textarea id="homeDescInput" rows="3" class="block w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm"></textarea>
-                            <button id="saveHomeDesc" class="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
-                                <i data-lucide="save" class="w-4 h-4"></i> Save Description
+            <!-- NEW: All Tags Page -->
+            <section id="page-tags" class="page" style="display:none;">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white">All Tags</h2>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Click a tag to filter games.</p>
+                <div id="tagsPageGrid" class="flex flex-wrap gap-3 mt-6">
+                    <!-- All tags will be injected here -->
+                </div>
+            </section>
+    
+            <!-- Admin Page -->
+            <section id="page-admin" class="page" style="display:none;">
+                <!-- This content is shown to admins -->
+                <div id="adminPanel" class="space-y-8">
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
+    
+                    <!-- Add / Edit Game Form -->
+                    <div class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                        <h2 id="formTitle" class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Add New Game</h2>
+                        <form id="gameForm" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
+                            <input id="gameIdInput" type="hidden"> <!-- For editing -->
+                            
+                            <!-- Title -->
+                            <div class="md:col-span-1">
+                                <label for="aTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+                                <input type="text" id="aTitle" placeholder="Game Title" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" required>
+                            </div>
+                            
+                            <!-- Section -->
+                            <div class="md:col-span-1">
+                                <label for="aSection" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Section</label>
+                                <select id="aSection" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" required>
+                                    <!-- Sections loaded by JS -->
+                                </select>
+                            </div>
+
+                            <!-- Description -->
+                            <div class="md:col-span-1">
+                                <label for="aDesc" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Short Description</label>
+                                <input type="text" id="aDesc" placeholder="A short description" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+
+                            <!-- NEW: Tags Input -->
+                            <div class="md:col-span-1">
+                                <label for="aTags" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags (comma-separated)</label>
+                                <input type="text" id="aTags" placeholder="e.g., puzzle, action, 2-player" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+
+                            <!-- Thumbnail URL -->
+                            <div class="md:col-span-2">
+                                <label for="aThumbUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Thumbnail URL</label>
+                                <input type="url" id="aThumbUrl" placeholder="https://example.com/image.png" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            <!-- Embed Code -->
+                            <div class="md:col-span-2">
+                                <label for="aEmbed" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Embed Code (e.g., iframe)</label>
+                                <textarea id="aEmbed" rows="4" placeholder="<iframe src='...'></iframe>" class="block w-full p-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                            </div>
+                            <!-- OR Game URL -->
+                            <div class="md:col-span-2">
+                                 <label for="aUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300">OR Direct Game URL (takes priority over embed)</label>
+                                <input type="url" id="aUrl" placeholder="https://example.com/game" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            <!-- Form Buttons -->
+                            <div class="flex items-center gap-4 md:col-span-2">
+                                <button type="submit" id="addGameBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                    <i data-lucide="plus" class="w-5 h-5"></i>
+                                    <span>Add Game</span>
+                                </button>
+                                <button type="button" id="clearFormBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">
+                                    <i data-lucide="x" class="w-5 h-5"></i>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+    
+                    <!-- Manage Games List -->
+                    <div class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                         <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Manage Existing Games</h2>
+                         <div id="adminList" class="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2 lg:grid-cols-3">
+                            <!-- Admin game cards injected here -->
+                         </div>
+                    </div>
+    
+                    <!-- Site Settings -->
+                    <div class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Site Settings</h2>
+                        <div class="grid grid-cols-1 gap-6 mt-4 md:grid-cols-2">
+                            <!-- Homepage Description -->
+                            <div>
+                                <label for="homeDescInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Homepage Description</label>
+                                <textarea id="homeDescInput" rows="3" class="block w-full p-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                                <button id="saveHomeDesc" class="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Description
+                                </button>
+                            </div>
+                            <!-- Theme Color -->
+                            <div>
+                                <label for="colorPicker" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Theme Primary Color</label>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <input id="colorPicker" type="color" value="#3b82f6" class="w-12 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded-md">
+                                    <button id="saveColorBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                        <i data-lucide="save" class="w-4 h-4"></i> Save Color
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- NEW: Panic Button URL -->
+                            <div>
+                                <label for="panicUrlInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Panic Button URL (Press 'Esc')</label>
+                                <input type="url" id="panicUrlInput" placeholder="https://google.com" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <button id="savePanicUrl" class="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save URL
+                                </button>
+                            </div>
+                            <!-- NEW: Panic Button Title -->
+                            <div>
+                                <label for="panicTitleInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Panic Button Page Title</label>
+                                <input type="text" id="panicTitleInput" placeholder="Google" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <button id="savePanicTitle" class="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
+                                    <i data-lucide="save" class="w-4 h-4"></i> Save Title
+                                </button>
+                            </div>
+
+                            <!-- Manage Sections -->
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Manage Sections</label>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <input type="text" id="newSectionName" placeholder="New section name" class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    <button id="addSectionBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white whitespace-nowrap rounded-md bg-accent hover:opacity-90">
+                                         <i data-lucide="plus" class="w-5 h-5"></i> Add
+                                    </button>
+                                </div>
+                                <div id="sectionsList" class="mt-4 space-y-2">
+                                    <!-- Section list injected here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+    
+                    <!-- NEW: Data Management -->
+                    <div class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Data Management</h2>
+                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Save all your games, settings, and stats to a file. You can import this file later to restore your data (e.g., in a different browser).</p>
+                        <div class="flex items-center gap-4 mt-4">
+                            <button id="exportDataBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md bg-green-600 hover:bg-green-700">
+                                <i data-lucide="download" class="w-4 h-4"></i> Export Data
+                            </button>
+                            <button id="importDataBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">
+                                <i data-lucide="upload" class="w-4 h-4"></i> Import Data
+                            </button>
+                            <input type="file" id="importFileInput" accept=".json" class="hidden">
+                        </div>
+                    </div>
+    
+                    <!-- Statistics -->
+                    <div class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Statistics</h2>
+                             <button id="resetStatsBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-md hover:bg-red-700">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Reset All Stats
                             </button>
                         </div>
-                        <!-- Theme Color -->
-                        <div>
-                            <label for="colorPicker" class="block text-sm font-medium text-gray-700">Theme Primary Color</label>
-                            <div class="flex items-center gap-2 mt-1">
-                                <input id="colorPicker" type="color" value="#3b82f6" class="w-12 h-10 p-1 border border-gray-300 rounded-md">
-                                <button id="saveColorBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-md bg-accent hover:opacity-90">
-                                    <i data-lucide="save" class="w-4 h-4"></i> Save Color
-                                </button>
+                        <div id="statsSummary" class="mt-4 space-y-4">
+                            <!-- Stats summary injected here -->
+                        </div>
+                        
+                        <!-- NEW: Stats Chart Container -->
+                        <div class="mt-8">
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Plays in Last 7 Days</h3>
+                            <div id="statsChartContainer" class="mt-4">
+                                <!-- Stats chart will be injected here -->
                             </div>
                         </div>
-                        <!-- Manage Sections -->
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700">Manage Sections</label>
-                            <div class="flex items-center gap-2 mt-1">
-                                <input type="text" id="newSectionName" placeholder="New section name" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm">
-                                <button id="addSectionBtn" class="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white whitespace-nowrap rounded-md bg-accent hover:opacity-90">
-                                     <i data-lucide="plus" class="w-5 h-5"></i> Add
-                                </button>
-                            </div>
-                            <div id="sectionsList" class="mt-4 space-y-2">
-                                <!-- Section list injected here -->
-                            </div>
+
+                        <!-- NEW: Reported Games -->
+                        <div id="reportedGamesContainer" class="mt-8">
+                            <!-- Reported games will be injected here -->
                         </div>
                     </div>
                 </div>
+            </section>
+    
+        </main>
+    
+        <!-- Footer -->
+        <footer class="py-6 mt-12 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div class="container px-4 mx-auto text-sm text-center text-gray-500 dark:text-gray-400 max-w-7xl sm:px-6 lg:px-8">
+                Powered by Local Storage &amp; Tailwind CSS. Refactored from Apps Script.
+                <p class->Press <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-300 rounded-md dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">Esc</kbd> to toggle panic mode.</p>
+            </div>
+        </footer>
+    </div> <!-- End #appWrapper -->
 
-                <!-- Statistics -->
-                <div class="p-6 bg-white rounded-lg shadow-md">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-2xl font-semibold text-gray-800">Statistics</h2>
-                         <button id="resetStatsBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-md hover:bg-red-700">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i> Reset All Stats
+    <!-- NEW: Panic Mode Cloaker -->
+    <div id="panicCloak" class="hidden">
+        <iframe id="panicFrame" src="" style="width:100%; height:100vh; border:none;"></iframe>
+    </div>
+
+    <!-- NEW: Game Modal (Lightbox) -->
+    <div id="gameModal" class="fixed inset-0 z-[60] flex-col items-center justify-center bg-gray-900 bg-opacity-90 backdrop-blur-sm" style="display: none;">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between w-full max-w-6xl p-4">
+            <h3 id="gameModalTitle" class="text-lg font-semibold text-white truncate">Loading Game...</h3>
+            <div class="flex items-center gap-2">
+                <!-- NEW: Share Button -->
+                <button id="gameModalShareBtn" title="Share Site" class="p-2 text-white rounded-lg hover:bg-gray-700">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                </button>
+                <!-- NEW: Report Button -->
+                <button id="gameModalReportBtn" title="Report Broken Game" class="p-2 text-white rounded-lg hover:bg-gray-700">
+                    <i data-lucide="flag" class="w-5 h-5"></i>
+                </button>
+                <button id="gameModalFullscreenBtn" title="Toggle Fullscreen" class="p-2 text-white rounded-lg hover:bg-gray-700">
+                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                </button>
+                <button id="gameModalNewTabBtn" title="Open in New Tab" class="p-2 text-white rounded-lg hover:bg-gray-700">
+                    <i data-lucide="external-link" class="w-5 h-5"></i>
+                </button>
+                <button id="gameModalCloseBtn" title="Close Game" class="p-2 text-white rounded-lg hover:bg-gray-700">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Modal Content -->
+        <div id="gameModalContentWrapper" class="flex flex-col w-full h-full max-w-6xl p-4 pt-0">
+            <div id="gameModalContent" class="flex-1 w-full bg-black border-4 border-gray-600 rounded-lg overflow-hidden">
+                <!-- Game iframe/embed will be injected here -->
+            </div>
+            <!-- NEW: Game Notes & Rating -->
+            <div class="flex flex-col gap-4 mt-2 md:flex-row">
+                <!-- Notes -->
+                <div id="gameNotesContainer" class="flex-1">
+                    <label id="gameNotesLabel" for="gameNotesTextarea" class="text-sm font-semibold text-white">My Private Notes:</label>
+                    <textarea id="gameNotesTextarea" rows="3" class="w-full p-2 mt-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-md dark:bg-gray-300" placeholder="Type your notes here..."></textarea>
+                </div>
+                <!-- Rating -->
+                <div id="gameRatingContainer">
+                    <label class="text-sm font-semibold text-white">Rate this game:</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <button id="gameRatingLike" data-action="like" class="game-rating-btn p-3 text-gray-400 bg-gray-700 rounded-lg hover:text-white hover:bg-gray-600">
+                            <i data-lucide="thumbs-up" class="w-5 h-5"></i>
                         </button>
-                    </div>
-                    <div id="statsSummary" class="mt-4 space-y-4">
-                        <!-- Stats summary injected here -->
+                        <button id="gameRatingDislike" data-action="dislike" class="game-rating-btn p-3 text-gray-400 bg-gray-700 rounded-lg hover:text-white hover:bg-gray-600">
+                            <i data-lucide="thumbs-down" class="w-5 h-5"></i>
+                        </button>
                     </div>
                 </div>
             </div>
-        </section>
-
-    </main>
-
-    <!-- Footer -->
-    <footer class="py-6 mt-12 border-t border-gray-200 bg-white">
-        <div class="container px-4 mx-auto text-sm text-center text-gray-500 max-w-7xl sm:px-6 lg:px-8">
-            Powered by Local Storage &amp; Tailwind CSS. Refactored from Apps Script.
         </div>
-    </footer>
+    </div>
 
     <!-- Custom Modal for Alerts -->
-    <div id="alertModal" class="fixed inset-0 z-50 flex items-center justify-centerhidden" style="display: none;">
+    <div id="alertModal" class="fixed inset-0 z-[70] flex items-center justify-centerhidden" style="display: none;"> <!-- Increased z-index -->
         <div class="fixed inset-0 bg-gray-900 bg-opacity-50" id="alertBackdrop"></div>
-        <div class="z-10 w-full max-w-md p-6 mx-4 bg-white rounded-lg shadow-xl">
+        <div class="z-10 w-full max-w-md p-6 mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl">
             <div class="flex items-start">
                 <div id="alertIcon" class="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-blue-100">
                     <i data-lucide="info" class="w-6 h-6 text-blue-600"></i>
                 </div>
                 <div class="ml-4">
-                    <h3 id="alertTitle" class="text-lg font-semibold text-gray-900">Notification</h3>
-                    <p id="alertMessage" class="mt-2 text-sm text-gray-600">This is an alert message.</p>
+                    <h3 id="alertTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Notification</h3>
+                    <p id="alertMessage" class="mt-2 text-sm text-gray-600 dark:text-gray-400">This is an alert message.</p>
                 </div>
             </div>
             <div class="flex justify-end mt-6">
                 <button id="alertOkBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">OK</button>
                 <button id="alertConfirmBtn" class="px-4 py-2 ml-3 font-semibold text-white rounded-md bg-accent hover:opacity-90">Confirm</button>
-                <button id="alertCancelBtn" class="px-4 py-2 ml-3 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+                <button id="alertCancelBtn" class="px-4 py-2 ml-3 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: User Profile Modal -->
+    <div id="userProfileModal" class="fixed inset-0 z-[70] flex items-center justify-center" style="display: none;">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-50" id="userProfileBackdrop"></div>
+        <div class="z-10 w-full max-w-md p-6 mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">My Profile</h3>
+            
+            <!-- Nickname -->
+            <div class="mt-4">
+                <label for="userNicknameInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nickname</label>
+                <input type="text" id="userNicknameInput" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Player">
+            </div>
+
+            <!-- Avatar -->
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Choose an Avatar</label>
+                <div id="userAvatarGrid" class="grid grid-cols-8 gap-2 mt-2">
+                    <!-- Avatars injected by JS -->
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-6">
+                <button id="userProfileSaveBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">Save</button>
+                <button id="userProfileCancelBtn" class="px-4 py-2 ml-3 font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Main Application Script -->
-    <script type="module" src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
