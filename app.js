@@ -1,34 +1,4 @@
-// Import Firebase modules
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { 
-    getAuth, 
-    signInAnonymously, 
-    onAuthStateChanged,
-    signInWithCustomToken
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-    getFirestore, 
-    doc, 
-    getDoc, 
-    setDoc, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    onSnapshot, 
-    collection,
-    query,
-    increment,
-    writeBatch,
-    serverTimestamp,
-    arrayUnion,
-    arrayRemove
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
 // --- GLOBAL STATE ---
-let db;
-let auth;
-let currentUser = null;
-
 let allGames = {};
 let settings = {};
 let stats = { counts: {}, recent: [] };
@@ -37,11 +7,40 @@ let localRecent = []; // For storing recently played game IDs locally
 let currentGameSort = "name"; // "name" or "plays"
 let currentSearchQuery = "";
 
-// Firestore Collection Paths
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'unblocked-games-hub';
-const SETTINGS_PATH = `/artifacts/${appId}/public/data/settings`;
-const GAMES_PATH = `/artifacts/${appId}/public/data/games`;
-const STATS_PATH = `/artifacts/${appId}/public/data/stats`;
+// Use the original password from your Apps Script
+const ADMIN_PASS = 'Murtaza&AliWebsiteCode_.?!';
+
+// --- LOCALSTORAGE HELPER FUNCTIONS ---
+
+/**
+ * Gets and parses data from localStorage.
+ * @param {string} key The key to retrieve.
+ * @param {*} defaultValue The default value if key doesn't exist or parsing fails.
+ * @returns {*} The parsed data or the default value.
+ */
+function getStorageData(key, defaultValue) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return defaultValue;
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        console.error(`Failed to parse localStorage key "${key}":`, e);
+        return defaultValue;
+    }
+}
+
+/**
+ * Stringifies and saves data to localStorage.
+ * @param {string} key The key to save.
+ * @param {*} data The data to save.
+ */
+function setStorageData(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.error(`Failed to save to localStorage key "${key}":`, e);
+    }
+}
 
 
 // --- DOM ELEMENTS ---
@@ -66,11 +65,6 @@ const homeDesc = $("homeDesc");
 const recentlyPlayedGrid = $("recentlyPlayedGrid");
 
 // Admin
-const adminLocker = $("adminLocker");
-const adminClaim = $("adminClaim");
-const adminDenied = $("adminDenied");
-const adminDeniedUserId = $("adminDeniedUserId");
-const claimAdminBtn = $("claimAdminBtn");
 const adminPanel = $("adminPanel");
 
 // Admin Form
@@ -199,138 +193,40 @@ alertBackdrop.onclick = () => alertModal.style.display = 'none';
 // --- INITIALIZATION ---
 
 /**
- * Main entry point. Initializes Firebase and sets up auth.
+ * Main entry point. Loads data from localStorage and renders the app.
  */
-async function initialize() {
-    try {
-        // Use provided Firebase config
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        if (!firebaseConfig.apiKey) {
-            console.error("Firebase config is missing.");
-            customAlert("Site configuration is missing. Admin features will be disabled.", "Config Error", "error");
-            loadingModal.style.display = 'none';
-            return;
-        }
-        
-        const app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
+function initialize() {
+    // Load all data from localStorage
+    settings = getStorageData('hubSettings', {
+        homepageDescription: 'Welcome! Use the Admin panel to set this description.',
+        sections: ['Games'],
+        primaryColor: '#3b82f6'
+    });
+    allGames = getStorageData('hubGames', {});
+    stats = getStorageData('hubStats', { counts: {}, recent: [] });
+    
+    loadLocalRecent(); // This already uses localStorage
 
-        // Load local recently played
-        loadLocalRecent();
+    // Update "auth" status (it's just "local" now)
+    authMessage.textContent = `Local Storage`;
+    authStatus.classList.remove('bg-gray-100');
+    authStatus.classList.add('bg-blue-100', 'text-blue-700');
 
-        // Set up auth state listener
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // User is signed in
-                currentUser = user;
-                authMessage.textContent = `Online`;
-                authStatus.classList.remove('bg-gray-100');
-                authStatus.classList.add('bg-green-100', 'text-green-700');
-                console.log("Authenticated with User ID:", currentUser.uid);
-                
-                // User is authenticated, now load all data
-                setupListeners();
-            } else {
-                // User is signed out, or not yet signed in
-                currentUser = null;
-                authMessage.textContent = "Offline";
-                authStatus.classList.remove('bg-green-100', 'text-green-700');
-                authStatus.classList.add('bg-gray-100');
-                console.log("No user signed in. Attempting anonymous sign-in.");
-                // Try to sign in
-                await attemptSignIn();
-            }
-        });
-
-    } catch (error) {
-        console.error("Firebase Initialization Error:", error);
-        customAlert(`Error connecting to site database: ${error.message}`, "Connection Error", "error");
-        loadingModal.style.display = 'none';
-    }
+    // Render everything
+    applySettings();
+    renderNav();
+    renderAllGameSections();
+    renderAll();
+    
+    loadingModal.style.display = 'none'; // Hide loading screen
 }
 
-/**
- * Attempts to sign in, first with custom token, then anonymously.
- */
-async function attemptSignIn() {
-    try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            console.log("Attempting sign in with custom token...");
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-            console.log("Attempting anonymous sign-in...");
-            await signInAnonymously(auth);
-        }
-    } catch (error) {
-        console.error("Sign-in Error:", error);
-        customAlert(`Failed to authenticate with the service: ${error.message}`, "Auth Error", "error");
-        loadingModal.style.display = 'none';
-    }
-}
-
-/**
- * Sets up Firestore listeners for real-time data.
- */
+// No-op functions that were for Firebase
 function setupListeners() {
-    // Listener for Settings
-    const settingsDocRef = doc(db, SETTINGS_PATH, 'config');
-    onSnapshot(settingsDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            settings = docSnap.data();
-            console.log("Settings updated:", settings);
-        } else {
-            // No settings yet, use defaults
-            console.log("No settings document found. Using defaults.");
-            settings = {
-                homepageDescription: 'Welcome! Use the Admin panel to set this description.',
-                sections: ['Games'],
-                primaryColor: '#3b82f6',
-                adminUID: null
-            };
-        }
-        applySettings(); // Apply UI changes
-        renderNav(); // Re-render nav in case sections changed
-        renderAdminPanel(); // Re-render admin panel for auth check
-        renderAllGameSections(); // Re-render game sections
-        renderAll(); // Re-render all content
-        loadingModal.style.display = 'none'; // Hide loading
-    }, (error) => {
-        console.error("Error listening to settings:", error);
-        customAlert("Error loading site settings.", "Error", "error");
-        loadingModal.style.display = 'none';
-    });
-
-    // Listener for Games
-    const gamesQuery = query(collection(db, GAMES_PATH));
-    onSnapshot(gamesQuery, (snapshot) => {
-        let newGames = {};
-        snapshot.forEach((doc) => {
-            newGames[doc.id] = { ...doc.data(), id: doc.id };
-        });
-        allGames = newGames;
-        console.log("Games updated:", Object.keys(allGames).length);
-        renderAll(); // Re-render all content
-    }, (error) => {
-        console.error("Error listening to games:", error);
-        customAlert("Error loading games list.", "Error", "error");
-    });
-
-    // Listener for Stats
-    const statsDocRef = doc(db, STATS_PATH, 'summary');
-    onSnapshot(statsDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            stats = docSnap.data();
-        } else {
-            console.log("No stats document found. Using defaults.");
-            stats = { counts: {}, recent: [] };
-        }
-        console.log("Stats updated:", stats);
-        renderAll(); // Re-render all content (for play counts)
-    }, (error) => {
-        console.error("Error listening to stats:", error);
-        customAlert("Error loading site statistics.", "Error", "error");
-    });
+    // Not needed for localStorage
+}
+async function attemptSignIn() {
+    // Not needed for localStorage
 }
 
 // --- RENDER FUNCTIONS ---
@@ -341,11 +237,13 @@ function setupListeners() {
 function renderAll() {
     if (!settings.sections) return; // Wait for settings
     
-    renderAllGameSections();
-    renderAdminPanel();
+    // We don't need to re-render *everything* constantly,
+    // but we will manually call render functions after each action.
+    renderAllGameSections(); 
     renderStatsSummary();
     renderAdminList();
     renderRecentlyPlayed();
+    // No need to call renderAdminPanel() here, it's static
 }
 
 /**
@@ -510,7 +408,7 @@ function renderAllGameSections() {
     lucide.createIcons(); // Redraw icons
     // Ensure the currently viewed page is still visible
     const activePage = document.querySelector('.nav-button.bg-accent')?.dataset.page || 'page-home';
-    showPage(activePage);
+    showPage(activePage, true); // true = skip password check on load
 }
 
 /**
@@ -580,33 +478,13 @@ function renderRecentlyPlayed() {
 }
 
 /**
- * Renders the admin panel, checking for auth status.
+ * Renders the admin panel. No auth check needed here anymore,
+ * as it's handled by showPage().
  */
 function renderAdminPanel() {
-    if (!currentUser || !settings) return;
-
-    if (settings.adminUID) {
-        // Admin is set
-        if (settings.adminUID === currentUser.uid) {
-            // This IS the admin
-            adminLocker.style.display = 'none';
-            adminPanel.style.display = 'block';
-            renderAdminSettingsList();
-        } else {
-            // This is NOT the admin
-            adminLocker.style.display = 'block';
-            adminPanel.style.display = 'none';
-            adminClaim.style.display = 'none';
-            adminDenied.style.display = 'block';
-            adminDeniedUserId.textContent = currentUser.uid;
-        }
-    } else {
-        // No admin is set, show claim button
-        adminLocker.style.display = 'block';
-        adminPanel.style.display = 'none';
-        adminClaim.style.display = 'block';
-        adminDenied.style.display = 'none';
-    }
+    // This function is now much simpler.
+    // It just needs to render lists that might change.
+    renderAdminSettingsList();
 }
 
 /**
@@ -777,7 +655,7 @@ function renderStatsSummary() {
                 ${recent.map(r => {
                     const g = allGames[r.gameId];
                     const time = new Date(r.timeIso).toLocaleString();
-                    return `<li class="p-2 text-sm bg-gray-50 rounded-md">${time} - <strong>${escapeHtml((g && g.title) || r.gameId)}</strong> (User: ${escapeHtml(r.userKey.substring(0, 8))}...)</li>`;
+                    return `<li class="p-2 text-sm bg-gray-50 rounded-md">${time} - <strong>${escapeHtml((g && g.title) || r.gameId)}</strong></li>`;
                 }).join('') || '<li>No recent plays.</li>'}
             </ul>
         </div>
@@ -793,8 +671,19 @@ function renderStatsSummary() {
 /**
  * Shows a specific page and hides all others.
  * @param {string} pageId - The ID of the page element to show.
+ * @param {boolean} [skipPasswordCheck=false] - Whether to bypass the admin password prompt.
  */
-function showPage(pageId) {
+function showPage(pageId, skipPasswordCheck = false) {
+    if (pageId === 'page-admin' && !skipPasswordCheck) {
+        const code = prompt('Enter admin passcode:');
+        if (code !== ADMIN_PASS) {
+            customAlert('Incorrect password.', 'Access Denied', 'error');
+            return; // Stop navigation
+        }
+        // If password is correct, render the admin panel dynamic lists
+        renderAdminPanel();
+    }
+
     pages.forEach(p => p.style.display = 'none');
     gameSectionsContainer.querySelectorAll('.page').forEach(p => p.style.display = 'none');
     
@@ -838,43 +727,31 @@ mobileMenuButton.onclick = () => {
  * @param {object} game - The game object.
  * @param {boolean} [record=true] - Whether to record the click stat.
  */
-async function handleGameClick(game, record = true) {
+function handleGameClick(game, record = true) {
     if (record) {
         try {
-            // Update stats in Firestore
-            const statsRef = doc(db, STATS_PATH, 'summary');
-            const gameCountKey = `counts.${game.id}`; // Key for the specific game
+            // Update stats in localStorage
+            const gameId = game.id;
+            stats.counts[gameId] = (stats.counts[gameId] || 0) + 1;
             
             const newRecentEntry = {
                 gameId: game.id,
                 timeIso: new Date().toISOString(),
-                userKey: currentUser?.uid || 'anonymous'
+                userKey: 'local' // Simplified user key
             };
+            stats.recent.unshift(newRecentEntry);
+            
+            // Cap recent list to last 200
+            if (stats.recent.length > 200) stats.recent = stats.recent.slice(0, 200);
 
-            // Use a batch write to update multiple fields
-            const batch = writeBatch(db);
+            setStorageData('hubStats', stats);
             
-            // Increment the game's play count
-            batch.update(statsRef, { [gameCountKey]: increment(1) });
-            
-            // Add to recent plays array, remove old ones
-            batch.update(statsRef, {
-                recent: arrayUnion(newRecentEntry)
-            });
-            
-            await batch.commit();
-
-            // After commit, check if recent array needs trimming
-            // This is a "good enough" approximation to keep the array size down
-            if (stats.recent && stats.recent.length > 200) {
-                const oldRecent = stats.recent.slice(0, 50); // Keep the newest 150
-                await updateDoc(statsRef, {
-                    recent: arrayRemove(...oldRecent)
-                });
-            }
-            
-            // Add to local recently played
             addLocalRecent(game.id);
+            
+            // Re-render sections that show stats
+            renderAllGameSections();
+            renderStatsSummary();
+            renderAdminList();
 
         } catch (error) {
             console.error("Error recording click:", error);
@@ -951,28 +828,8 @@ function addLocalRecent(gameId) {
     renderRecentlyPlayed(); // Re-render the home section
 }
 
-// Admin: Claim Role
-claimAdminBtn.onclick = async () => {
-    const confirmed = await customConfirm(
-        "Are you sure you want to become the site administrator? This action can only be done once and is irreversible.",
-        "Claim Admin Role?"
-    );
-    if (!confirmed) return;
-
-    try {
-        const settingsRef = doc(db, SETTINGS_PATH, 'config');
-        // We set merge: true just in case a settings doc was partially created
-        await setDoc(settingsRef, { adminUID: currentUser.uid }, { merge: true });
-        customAlert("You are now the site administrator!", "Success", "success");
-        // The onSnapshot listener will automatically update the UI
-    } catch (error) {
-        console.error("Error claiming admin role:", error);
-        customAlert(`Error claiming admin role: ${error.message}`, "Error", "error");
-    }
-};
-
 // Admin: Game Form
-gameForm.onsubmit = async (e) => {
+gameForm.onsubmit = (e) => {
     e.preventDefault();
     
     const gameData = {
@@ -993,17 +850,24 @@ gameForm.onsubmit = async (e) => {
     try {
         if (gameId) {
             // Update existing game
-            const gameRef = doc(db, GAMES_PATH, gameId);
-            await updateDoc(gameRef, gameData);
+            allGames[gameId] = { ...allGames[gameId], ...gameData };
             customAlert(`Updated game: ${gameData.title}`, "Success", "success");
         } else {
             // Add new game
-            gameData.created = serverTimestamp(); // Add created time
-            const gamesCollection = collection(db, GAMES_PATH);
-            await addDoc(gamesCollection, gameData);
+            const newId = 'g_' + new Date().getTime();
+            gameData.id = newId;
+            gameData.created = new Date().toISOString();
+            allGames[newId] = gameData;
             customAlert(`Added new game: ${gameData.title}`, "Success", "success");
         }
+        
+        setStorageData('hubGames', allGames); // Save updated games
         clearAddForm();
+        
+        // Re-render lists
+        renderAllGameSections();
+        renderAdminList();
+
     } catch (error) {
         console.error("Error saving game:", error);
         customAlert(`Error saving game: ${error.message}`, "Error", "error");
@@ -1048,32 +912,20 @@ async function deleteGame(id, title) {
     if (!confirmed) return;
     
     try {
-        // Delete game doc
-        const gameRef = doc(db, GAMES_PATH, id);
-        await deleteDoc(gameRef);
+        // Delete from allGames
+        delete allGames[id];
+        setStorageData('hubGames', allGames);
         
         // Remove stats for this game
-        const statsRef = doc(db, STATS_PATH, 'summary');
-        const gameCountKey = `counts.${id}`;
-        await updateDoc(statsRef, {
-            [gameCountKey]: deleteField() // `deleteField` is not imported, use batch
-        });
-        
-        // A better way to remove a map field is to set it to null or use a batch,
-        // but let's just fetch, modify, and set.
-        // Or, even better, just leave the stat and it'll be orphaned.
-        // For this, we'll just delete the game. The stats will be orphaned but won't show.
-        // To be cleaner, we can remove the count field.
-        const currentStats = (await getDoc(statsRef)).data()
-        if (currentStats && currentStats.counts && currentStats.counts[id]) {
-            delete currentStats.counts[id];
-            // We also need to remove recent plays
-            currentStats.recent = (currentStats.recent || []).filter(r => r.gameId !== id);
-            await setDoc(statsRef, currentStats); // Set the whole doc back
-        }
+        delete stats.counts[id];
+        stats.recent = stats.recent.filter(r => r.gameId !== id);
+        setStorageData('hubStats', stats);
 
         customAlert(`Deleted game: ${title}`, "Success", "success");
-        // UI will update via onSnapshot
+        
+        // Re-render UI
+        renderAll();
+
     } catch (error) {
         console.error("Error deleting game:", error);
         customAlert(`Error deleting game: ${error.message}`, "Error", "error");
@@ -1081,8 +933,8 @@ async function deleteGame(id, title) {
 }
 
 // Admin: Settings
-saveHomeDesc.onclick = () => saveSettings({ homepageDescription: homeDescInput.value });
-saveColorBtn.onclick = () => saveSettings({ primaryColor: colorPicker.value });
+saveHomeDesc.onclick = () => saveSettingsAndRender({ homepageDescription: homeDescInput.value });
+saveColorBtn.onclick = () => saveSettingsAndRender({ primaryColor: colorPicker.value });
 
 addSectionBtn.onclick = async () => {
     const name = newSectionName.value.trim();
@@ -1092,7 +944,7 @@ addSectionBtn.onclick = async () => {
     }
     
     const newSections = [...settings.sections, name];
-    await saveSettings({ sections: newSections });
+    await saveSettingsAndRender({ sections: newSections });
     newSectionName.value = '';
 };
 
@@ -1106,7 +958,7 @@ async function handleDeleteSection(sectionName) {
     if (!confirmed) return;
     
     const newSections = settings.sections.filter(s => s !== sectionName);
-    await saveSettings({ sections: newSections });
+    await saveSettingsAndRender({ sections: newSections });
 }
 
 async function handleRenameSection(oldName, newName) {
@@ -1116,19 +968,20 @@ async function handleRenameSection(oldName, newName) {
     
     // 1. Update section array in settings
     const newSections = settings.sections.map(s => (s === oldName ? newName : s));
-    await saveSettings({ sections: newSections });
+    settings.sections = newSections; // Update local state
     
     // 2. Update all games using this section
-    const batch = writeBatch(db);
-    const gamesToUpdate = Object.values(allGames).filter(g => g.section === oldName);
-    
-    gamesToUpdate.forEach(game => {
-        const gameRef = doc(db, GAMES_PATH, game.id);
-        batch.update(gameRef, { section: newName });
+    Object.values(allGames).forEach(game => {
+        if (game.section === oldName) {
+            game.section = newName;
+        }
     });
     
-    await batch.commit();
-    customAlert(`Renamed section "${oldName}" to "${newName}" and updated ${gamesToUpdate.length} games.`, "Success", "success");
+    setStorageData('hubGames', allGames); // Save updated games
+    await saveSettingsAndRender({ sections: newSections }); // Save updated settings
+    
+    customAlert(`Renamed section "${oldName}" to "${newName}".`, "Success", "success");
+    renderAll(); // Full re-render
 }
 
 async function reorderSection(index, dir) {
@@ -1139,13 +992,23 @@ async function reorderSection(index, dir) {
     // Swap
     [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
     
-    await saveSettings({ sections: arr });
+    await saveSettingsAndRender({ sections: arr });
 }
 
-async function saveSettings(newSettings) {
+/**
+ * Saves settings to localStorage and re-renders affected components.
+ */
+async function saveSettingsAndRender(newSettings) {
      try {
-        const settingsRef = doc(db, SETTINGS_PATH, 'config');
-        await setDoc(settingsRef, newSettings, { merge: true });
+        settings = { ...settings, ...newSettings };
+        setStorageData('hubSettings', settings);
+        
+        // Re-render components that use settings
+        applySettings();
+        renderNav();
+        renderAllGameSections();
+        renderAdminPanel(); // Re-renders the sections list
+
         customAlert("Settings saved!", "Success", "success");
     } catch (error) {
         console.error("Error saving settings:", error);
@@ -1155,16 +1018,21 @@ async function saveSettings(newSettings) {
 
 // Admin: Stats
 resetStatsBtn.onclick = async () => {
-     const confirmed = await customConfirm(
+    const confirmed = await customConfirm(
         "Are you sure you want to reset ALL play stats? This will set all counts to 0 and clear recent plays. This cannot be undone.",
         "Reset All Stats?"
     );
     if (!confirmed) return;
     
     try {
-        const statsRef = doc(db, STATS_PATH, 'summary');
-        await setDoc(statsRef, { counts: {}, recent: [] });
+        stats = { counts: {}, recent: [] };
+        setStorageData('hubStats', stats);
+        
         customAlert("All stats have been reset.", "Success", "success");
+        
+        // Re-render UI
+        renderAll();
+
     } catch (error) {
         console.error("Error resetting stats:", error);
         customAlert(`Error resetting stats: ${error.message}`, "Error", "error");
@@ -1187,8 +1055,26 @@ function escapeHtmlAttr(s) {
 }
 
 // --- START APP ---
-initialize();
-lucide.createIcons(); // Initial icon render
-
-// Set default page
-showPage('page-home');
+// We must wait for the DOM to be fully loaded before running the app
+// This ensures that all scripts, like lucide.js, are ready.
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        console.log("DOM Loaded. Initializing app...");
+        initialize();
+        lucide.createIcons(); // Initial icon render
+        
+        // Set default page
+        showPage('page-home', true); // true = skip password check on initial load
+        console.log("App initialized successfully.");
+        
+    } catch (err) {
+        console.error("A fatal error occurred during initialization:", err);
+        // If something goes wrong, force-hide the modal and show an error
+        const loadingModal = document.getElementById('loadingModal');
+        if (loadingModal) {
+            loadingModal.style.display = 'none';
+        }
+        // Use a simple alert as our custom modal might be broken
+        alert("Error: Could not load the application. Check the console for details.");
+    }
+});
