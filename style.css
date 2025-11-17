@@ -1,7 +1,7 @@
 /* Base styles */
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #f3f4f6; /* gray-100 */
+    /* Background colors are now handled by Tailwind dark: classes */
 }
 
 /* Helper to make icons the right size */
@@ -42,4 +42,210 @@ body {
 @keyframes rotation {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* NEW: Style for the "New" badge on game cards */
+.new-badge {
+    position: absolute;
+    top: 0.5rem; /* 8px */
+    left: 0.5rem; /* 8px */
+    background-color: var(--accent-color);
+    color: white;
+    padding: 0.125rem 0.5rem; /* 2px 8px */
+    font-size: 0.75rem; /* 12px */
+    font-weight: 700;
+    border-radius: 9999px; /* pill shape */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none; /* So it doesn't block clicks */
+}
+
+/* NEW: Styles for Tag Badges */
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem; /* 4px */
+    background-color: #e5e7eb; /* gray-200 */
+    color: #374151; /* gray-700 */
+    padding: 0.25rem 0.75rem; /* 4px 12px */
+    border-radius: 9999px;
+    font-size: 0.75rem; /* 12px */
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid #d1d5db; /* gray-300 */
+}
+.tag-badge:hover {
+    background-color: #d1d5db; /* gray-300 */
+}
+
+/* Dark mode for tags */
+.dark .tag-badge {
+    background-color: #374151; /* gray-700 */
+    color: #e5e7eb; /* gray-200 */
+    border-color: #4b5563; /* gray-600 */
+}
+.dark .tag-badge:hover {
+    background-color: #4b5563; /* gray-600 */
+}
+
+/* Active tag filter badge */
+.tag-badge.active {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: transparent;
+}
+.dark .tag-badge.active {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: transparent;
+}
+.tag-badge .tag-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem; /* 16px */
+    height: 1rem; /* 16px */
+    border-radius: 50%;
+    margin-right: -0.25rem; /* -4px */
+    background-color: rgba(0,0,0,0.1);
+}
+.tag-badge:hover .tag-clear {
+    background-color: rgba(0,0,0,0.2);
+}
+.dark .tag-badge .tag-clear {
+    background-color: rgba(255,255,255,0.1);
+}
+.dark .tag-badge:hover .tag-clear {
+    background-color: rgba(255,255,255,0.2);
+}
+
+
+/* NEW: Styles for Panic Mode */
+body.cloaked #appWrapper {
+    display: none;
+}
+body.cloaked #panicCloak {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 10000;
+}
+
+/* NEW: Styles for Game Modal */
+#gameModalContent iframe,
+#gameModalContent object,
+#gameModalContent embed {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* NEW: Styles for Stats Chart */
+.stats-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 150px;
+    padding: 0 10px;
+    border-bottom: 2px solid #e5e7eb; /* gray-200 */
+    gap: 2px;
+}
+.dark .stats-chart {
+    border-bottom-color: #4b5563; /* gray-600 */
+}
+.chart-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+.chart-bar {
+    width: 75%;
+    max-width: 50px;
+    background-color: var(--accent-color);
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease-out;
+    position: relative;
+    cursor: pointer;
+}
+.chart-bar:hover {
+    opacity: 0.8;
+}
+.chart-bar .tooltip {
+    position: absolute;
+    bottom: 105%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #111827; /* gray-900 */
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem; /* 12px */
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+.dark .chart-bar .tooltip {
+    background-color: #e5e7eb; /* gray-200 */
+    color: #1f2937; /* gray-800 */
+}
+.chart-bar:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+.chart-label {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 500;
+    margin-top: 4px;
+    color: #6b7280; /* gray-500 */
+}
+.dark .chart-label {
+    color: #9ca3af; /* gray-400 */
+}
+
+/* NEW: Styles for User Profile Modal */
+.avatar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem; /* 8px */
+    font-size: 1.5rem; /* 24px */
+    border-radius: 0.5rem; /* 8px */
+    cursor: pointer;
+    background-color: #f3f4f6; /* gray-100 */
+    border: 2px solid transparent;
+    transition: all 0.15s ease;
+}
+.dark .avatar-btn {
+    background-color: #374151; /* gray-700 */
+}
+.avatar-btn:hover {
+    background-color: #e5e7eb; /* gray-200 */
+}
+.dark .avatar-btn:hover {
+    background-color: #4b5563; /* gray-600 */
+}
+.avatar-btn.active {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+/* NEW: Styles for Game Rating Buttons */
+.game-rating-btn.active-like {
+    background-color: #22c55e; /* green-500 */
+    color: white;
+}
+.game-rating-btn.active-dislike {
+    background-color: #ef4444; /* red-500 */
+    color: white;
 }
