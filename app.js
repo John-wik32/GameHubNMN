@@ -1,7 +1,7 @@
 // --- FIREBASE AND INITIAL SETUP ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Enable detailed logging for debugging
@@ -26,14 +26,10 @@ let stats = {
 };
 let localRecent = [];
 let myFavorites = [];
-let myGameNotes = {};
 let myGameRatings = {};
 let hubUser = { nickname: 'Player', avatar: '🎮' };
 let currentTheme = 'light';
 let isCloaked = false;
-let currentTags = [];
-let currentGameSort = 'name';
-let currentSearchQuery = '';
 let currentGameUrl = null;
 const NEW_GAME_DAYS = 7;
 const ADMIN_PASS = '2025'; // The admin password for this hub
@@ -157,8 +153,12 @@ function customAlert(message, title = "Info", type = "info") {
         if (type === 'confirm') {
             const yesBtn = container.querySelector('.confirm-yes-btn');
             const noBtn = container.querySelector('.confirm-no-btn');
-            yesBtn.onclick = () => { close(); resolve(true); };
-            noBtn.onclick = () => { close(); resolve(false); };
+            if (yesBtn && noBtn) {
+                yesBtn.onclick = () => { close(); resolve(true); };
+                noBtn.onclick = () => { close(); resolve(false); };
+            } else {
+                 resolve(false); // Resolve false if buttons aren't found
+            }
         } else {
             // Resolve immediately for non-confirm messages
             resolve();
@@ -190,7 +190,9 @@ function renderNavigation() {
 
     // Clear existing navs
     desktopNav.innerHTML = '';
-    mobileNav.innerHTML = '';
+    const mobileNavContainer = mobileNav.querySelector('.flex-col');
+    if (mobileNavContainer) mobileNavContainer.innerHTML = '';
+
 
     const currentSection = document.querySelector('.page:not([style*="display:none"])')?.id.replace('page-', '') || 'home';
 
@@ -214,7 +216,7 @@ function renderNavigation() {
         mobileBtn.className = buttonClass + ' w-full justify-start'; // Full width for mobile
         mobileBtn.dataset.page = item.id;
         mobileBtn.innerHTML = `<i data-lucide="${item.icon}" class="w-5 h-5"></i><span>${item.name}</span>`;
-        mobileNav.querySelector('.flex-col').appendChild(mobileBtn);
+        if (mobileNavContainer) mobileNavContainer.appendChild(mobileBtn);
     });
 
     // Re-create lucide icons for the new elements
@@ -244,14 +246,16 @@ function switchPage(pageId) {
         renderFavoritesPage();
     } else if (pageId === 'tags') {
         renderTagsPage();
-    }
-}
-
-// Global click handler for page navigation
-function handlePageNavigation(e) {
-    const link = e.target.closest('.page-link');
-    if (link && link.dataset.page) {
-        switchPage(link.dataset.page);
+    } else if (pageId === 'admin') {
+         // Re-check admin status when navigating to admin page
+        const isAdmin = getStorageData('isAdmin', false);
+        const loginDiv = document.getElementById('adminLogin');
+        const toolsDiv = document.getElementById('adminTools');
+        if (loginDiv && toolsDiv) {
+            loginDiv.classList.toggle('hidden', isAdmin);
+            toolsDiv.classList.toggle('hidden', !isAdmin);
+        }
+        renderAdminList();
     }
 }
 
@@ -360,7 +364,7 @@ function renderGameSections() {
             games.sort((a, b) => a.title.localeCompare(b.title));
 
             const sectionHTML = `
-                <section id="page-${sectionKey}" class="page mt-8">
+                <section id="section-${sectionKey}" class="mt-8">
                     <h2 class="text-3xl font-bold text-gray-900 dark:text-white">${sectionTitles[sectionKey]}</h2>
                     <div class="grid grid-cols-1 gap-6 mt-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                         ${games.map(game => renderGameCard(game.id)).join('')}
@@ -370,6 +374,7 @@ function renderGameSections() {
             container.innerHTML += sectionHTML;
         }
     });
+    lucide.createIcons();
 }
 
 function renderFeaturedGame() {
@@ -391,6 +396,7 @@ function renderFeaturedGame() {
     } else {
         container.innerHTML = '';
     }
+    lucide.createIcons();
 }
 
 function renderRecentlyPlayed() {
@@ -408,6 +414,7 @@ function renderRecentlyPlayed() {
     }
 
     grid.innerHTML = recentGames.map(id => renderGameCard(id)).join('');
+    lucide.createIcons();
 }
 
 function renderFavoritesPage() {
@@ -425,6 +432,7 @@ function renderFavoritesPage() {
     }
 
     grid.innerHTML = favoriteGames.map(game => renderGameCard(game.id)).join('');
+    lucide.createIcons();
 }
 
 function renderTagsPage() {
@@ -487,8 +495,10 @@ function renderAll() {
     renderFeaturedGame();
     renderRecentlyPlayed();
     renderGameSections();
-    // Only render admin list if on admin page, but let's re-render it for consistency
-    renderAdminList(); 
+    // Only render admin list if the user is currently on the admin page
+    if (document.getElementById('page-admin')?.style.display !== 'none') {
+        renderAdminList(); 
+    }
 }
 
 // --- GAME MODAL LOGIC ---
@@ -528,15 +538,14 @@ function updateGameStats(gameId, type) {
     // Clean up zero or negative counts before sending
     Object.keys(updatePayload).forEach(key => {
         if (updatePayload[key] <= 0) {
-            updatePayload[key] = deleteField(); // Firestore function to delete a field (if available) - assuming here we use 0 instead as deleteField might not be in imported functions
-            updatePayload[key] = 0; // Use 0 instead of deletion to simplify state sync
+            updatePayload[key] = 0; // Use 0 to simplify state sync
         }
     });
 
     // 3. Update the user's private rating
-    const userRatingRef = doc(db, getPrivateCollectionPath('userProfile'), userId);
+    const userDocRef = doc(db, getPrivateCollectionPath('userProfile'), userId);
     
-    setDoc(userRatingRef, {
+    setDoc(userDocRef, {
         ratings: {
             ...myGameRatings,
             [gameId]: newRating
@@ -550,13 +559,21 @@ function updateGameStats(gameId, type) {
     }
 }
 
+function extractGameIdFromIframe() {
+    const gameIframe = document.getElementById('gameIframe');
+    if (gameIframe && gameIframe.src) {
+        // Example: https://game-url.html -> game-url
+        // We use the last path segment without the extension as the ID
+        return gameIframe.src.split('/').pop().split('.').shift();
+    }
+    return null;
+}
+
 function openGameModal(gameId) {
     const game = allGames[gameId];
     const gameModal = document.getElementById('gameModal');
     const modalGameTitle = document.getElementById('modalGameTitle');
     const gameIframe = document.getElementById('gameIframe');
-    const likeCountSpan = document.getElementById('likeCount');
-    const dislikeCountSpan = document.getElementById('dislikeCount');
     
     if (!game || !gameModal || !modalGameTitle || !gameIframe) return;
 
@@ -566,25 +583,44 @@ function openGameModal(gameId) {
     gameIframe.src = game.url;
     gameModal.classList.remove('hidden');
 
-    // Update stats UI
-    likeCountSpan.textContent = stats.ratings.likes[gameId] || 0;
-    dislikeCountSpan.textContent = stats.ratings.dislikes[gameId] || 0;
-    
-    // Highlight user's own rating
-    const userRating = myGameRatings[gameId];
-    const likeBtnIcon = document.querySelector('#modalLikeBtn i');
-    const dislikeBtnIcon = document.querySelector('#modalDislikeBtn i');
+    // Update stats UI (re-run logic to ensure correct button highlights)
+    const updateModalStatsUI = () => {
+        const currentId = extractGameIdFromIframe();
+        if (!currentId) return;
+        
+        const likeCountSpan = document.getElementById('likeCount');
+        const dislikeCountSpan = document.getElementById('dislikeCount');
+        const likeBtnIcon = document.querySelector('#modalLikeBtn i');
+        const dislikeBtnIcon = document.querySelector('#modalDislikeBtn i');
 
-    if (userRating === 'like') {
-        likeBtnIcon.classList.add('fill-green-500');
-        dislikeBtnIcon.classList.remove('fill-red-500');
-    } else if (userRating === 'dislike') {
-        dislikeBtnIcon.classList.add('fill-red-500');
-        likeBtnIcon.classList.remove('fill-green-500');
-    } else {
-        likeBtnIcon.classList.remove('fill-green-500');
-        dislikeBtnIcon.classList.remove('fill-red-500');
-    }
+        if (likeCountSpan) likeCountSpan.textContent = stats.ratings.likes[currentId] || 0;
+        if (dislikeCountSpan) dislikeCountSpan.textContent = stats.ratings.dislikes[currentId] || 0;
+
+        const userRating = myGameRatings[currentId];
+        
+        if (likeBtnIcon) likeBtnIcon.classList.toggle('fill-green-500', userRating === 'like');
+        if (dislikeBtnIcon) dislikeBtnIcon.classList.toggle('fill-red-500', userRating === 'dislike');
+    };
+    
+    // Initial call to set stats
+    updateModalStatsUI();
+    
+    // Set up a temporary listener for real-time rating updates while modal is open
+    // This is optional, as the main listener updates myGameRatings, but ensures the count is always fresh
+    const modalRatingListener = onSnapshot(doc(db, getPublicCollectionPath('hubStats'), 'ratings'), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            stats.ratings.likes = data.likes || {};
+            stats.ratings.dislikes = data.dislikes || {};
+            updateModalStatsUI();
+        }
+    });
+
+    // Clean up the listener when the modal closes
+    gameModal.onclose = () => {
+        modalRatingListener(); // Unsubscribe
+    };
+
 
     // Update recently played list (local only)
     localRecent = localRecent.filter(id => id !== gameId); // Remove if exists
@@ -600,6 +636,12 @@ function closeGameModal() {
     gameModal.classList.add('hidden');
     gameIframe.src = ''; // Stop the game/audio
     currentGameUrl = null;
+
+    // Call the optional onclose handler if it exists (for unsubscribing the temporary listener)
+    if (typeof gameModal.onclose === 'function') {
+        gameModal.onclose();
+        gameModal.onclose = null; 
+    }
 
     // Re-render home page sections (especially recent list)
     renderRecentlyPlayed();
@@ -623,7 +665,7 @@ async function signInUser() {
         }
     } catch (error) {
         console.error("Firebase Auth Error:", error);
-        document.getElementById('authMessage').textContent = 'Error';
+        document.getElementById('authMessage').textContent = 'Authentication Error';
     }
 }
 
@@ -642,11 +684,14 @@ function startListeners() {
 
     // 2. Settings Listener (public settings, like hub description)
     onSnapshot(doc(db, getPublicCollectionPath('hubSettings'), 'main'), (docSnap) => {
+        const homeDesc = document.getElementById('homeDesc');
         if (docSnap.exists()) {
             settings = docSnap.data();
-            document.getElementById('homeDesc').textContent = settings.hubDescription || 'A growing collection of unblocked games!';
+            if (homeDesc) homeDesc.textContent = settings.hubDescription || 'A growing collection of unblocked games!';
             // Apply theme from settings
             applyThemeColor(settings.accentColor || 'blue');
+        } else if (homeDesc) {
+             homeDesc.textContent = 'A growing collection of unblocked games!';
         }
     }, (error) => console.error("Settings Listener Error:", error));
     
@@ -668,7 +713,6 @@ function startListeners() {
             const data = docSnap.data();
             hubUser = data.profile || hubUser;
             myFavorites = data.favorites || [];
-            myGameNotes = data.notes || {};
             myGameRatings = data.ratings || {};
             
             // Update UI elements dependent on user state
@@ -679,21 +723,29 @@ function startListeners() {
 }
 
 function updateAuthUI(user) {
+    const authMessage = document.getElementById('authMessage');
+    const authStatus = document.getElementById('authStatus');
+    
     if (user) {
         userId = user.uid;
-        document.getElementById('authMessage').textContent = 'Online';
-        document.getElementById('authStatus').classList.remove('bg-gray-100', 'dark:bg-gray-700');
-        document.getElementById('authStatus').classList.add('bg-green-100', 'text-green-800', 'dark:bg-green-900', 'dark:text-green-300');
+        if (authMessage) authMessage.textContent = 'Online';
+        if (authStatus) {
+            authStatus.classList.remove('bg-gray-100', 'dark:bg-gray-700');
+            authStatus.classList.add('bg-green-100', 'text-green-800', 'dark:bg-green-900', 'dark:text-green-300');
+        }
     } else {
-        // Should not happen after sign-in, but good practice
-        document.getElementById('authMessage').textContent = 'Offline';
+        if (authMessage) authMessage.textContent = 'Offline';
     }
 }
 
 async function initialize() {
+    const loadingModal = document.getElementById('loadingModal');
+    
     if (!firebaseConfig.projectId) {
          console.error("Firebase is not configured. Cannot initialize database.");
-         document.getElementById('loadingModal').innerHTML = `<h2 class="text-xl font-bold text-white">Error: Firebase is not configured.</h2>`;
+         if (loadingModal) {
+             loadingModal.innerHTML = `<h2 class="text-xl font-bold text-white">Error: Firebase is not configured.</h2>`;
+         }
          return;
     }
     
@@ -707,11 +759,13 @@ async function initialize() {
     const savedCloak = getStorageData('cloakSettings', null);
 
     if (savedCloak) {
-        document.getElementById('cloakTitleInput').value = savedCloak.title || 'Google Drive';
-        document.getElementById('cloakFaviconInput').value = savedCloak.favicon || '📚';
+        const cloakTitleInput = document.getElementById('cloakTitleInput');
+        const cloakFaviconInput = document.getElementById('cloakFaviconInput');
+        if (cloakTitleInput) cloakTitleInput.value = savedCloak.title || 'Google Drive';
+        if (cloakFaviconInput) cloakFaviconInput.value = savedCloak.favicon || '📚';
     }
 
-    // Apply initial theme and cloaking state (if any)
+    // Apply initial theme
     document.documentElement.classList.toggle('dark', currentTheme === 'dark');
     updateThemeToggleUI();
     
@@ -720,8 +774,11 @@ async function initialize() {
         if (user) {
             updateAuthUI(user);
             startListeners();
-            // Hide loading modal once authenticated and data listeners are set up
-            document.getElementById('loadingModal').classList.add('hidden');
+            
+            // Fix 1: Hide loading modal only after successful authentication and listeners are started
+            if (loadingModal) {
+                 loadingModal.classList.add('hidden');
+            }
         } else {
             // Sign in anonymously if no user is present
             await signInUser();
@@ -739,7 +796,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const userProfileButton = document.getElementById('userProfileButton');
         const mobileMenuButton = document.getElementById('mobileMenuButton');
         const mobileNav = document.getElementById('mobileNav');
-        const randomGameBtn = document.getElementById('randomGameBtn');
 
         // Modals
         const userProfileModal = document.getElementById('userProfileModal');
@@ -765,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const adminLoginBtn = document.getElementById('adminLoginBtn');
         const adminPasswordInput = document.getElementById('adminPasswordInput');
         const saveGameBtn = document.getElementById('saveGameBtn');
-        const clearFormBtn = document.getElementById('clearFormBtn'); // THIS WAS LIKELY THE NULL ELEMENT
+        const clearFormBtn = document.getElementById('clearFormBtn'); // The previously reported problem child
         const exportDataBtn = document.getElementById('exportDataBtn');
         const importDataBtn = document.getElementById('importDataBtn');
         const importFileInput = document.getElementById('importFileInput');
@@ -780,25 +836,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function updateThemeToggleUI() {
-            const icon = themeToggle.querySelector('i');
-            if (currentTheme === 'dark') {
-                icon.dataset.lucide = 'moon';
-            } else {
-                icon.dataset.lucide = 'sun';
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                 if (icon) {
+                     if (currentTheme === 'dark') {
+                        icon.dataset.lucide = 'moon';
+                    } else {
+                        icon.dataset.lucide = 'sun';
+                    }
+                    lucide.createIcons();
+                }
             }
-            lucide.createIcons();
         }
 
         function applyThemeColor(color) {
             const root = document.documentElement;
-            // Get the RGB value for the selected Tailwind color (e.g., 'blue-500')
-            // For simplicity, we'll hardcode some defaults here or use a helper object
+            // Map common colors to RGB/Hex for dynamic Tailwind/CSS vars
             const colorMap = {
                 'blue': { hex: '#3b82f6', rgb: '59, 130, 246' },
                 'green': { hex: '#22c55e', rgb: '34, 197, 94' },
                 'red': { hex: '#ef4444', rgb: '239, 68, 68' },
                 'indigo': { hex: '#6366f1', rgb: '99, 102, 241' },
-                // ... add more colors as needed
+                'purple': { hex: '#a855f7', rgb: '168, 85, 247' },
+                'yellow': { hex: '#f59e0b', rgb: '245, 158, 11' },
             };
             const theme = colorMap[color] || colorMap['blue'];
 
@@ -824,13 +884,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function handleAdminLogin() {
+            if (!adminPasswordInput) return;
             const password = adminPasswordInput.value;
             if (password === ADMIN_PASS) {
                 setStorageData('isAdmin', true);
-                document.getElementById('adminLogin').classList.add('hidden');
-                document.getElementById('adminTools').classList.remove('hidden');
+                const loginDiv = document.getElementById('adminLogin');
+                const toolsDiv = document.getElementById('adminTools');
+                if (loginDiv) loginDiv.classList.add('hidden');
+                if (toolsDiv) toolsDiv.classList.remove('hidden');
                 customAlert('Admin access granted!', 'Success', 'success');
-                renderNavigation(); // Rerender nav to show the Admin link
+                renderNavigation(); 
             } else {
                 customAlert('Incorrect password.', 'Denied', 'error');
             }
@@ -871,13 +934,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     customAlert(`Game "${title}" updated!`, "Success", "success");
                 } else {
                     // Add new game
-                    // Auto-generate a simple ID for the new game
                     const newId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-*|-*$/g, '') + `-${new Date().getTime()}`;
                     await setDoc(doc(gamesRef, newId), { id: newId, ...gameData, created: new Date().toISOString() });
                     customAlert(`Game "${title}" added!`, "Success", "success");
                 }
                 
-                // Data will re-render automatically via the Firestore listener
                 clearAddForm();
             } catch (error) {
                 console.error("Error saving game:", error);
@@ -947,15 +1008,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.games) {
                         for (const gameId in data.games) {
                             const game = data.games[gameId];
+                            // Ensure the game object has an ID field for consistency
+                            const finalGame = { ...game, id: gameId };
                             const gameDocRef = doc(db, getPublicCollectionPath('games'), gameId);
-                            // Use setDoc to overwrite or create the game
-                            await setDoc(gameDocRef, game);
+                            await setDoc(gameDocRef, finalGame);
                         }
                         customAlert(`Imported ${Object.keys(data.games).length} games.`, "Success", "success");
                     }
-
-                    // Optional: Import settings and stats here if needed, 
-                    // but usually, admin manages this manually or through dedicated inputs.
 
                 } catch (err) {
                     console.error("Error during data import:", err);
@@ -969,35 +1028,46 @@ document.addEventListener('DOMContentLoaded', () => {
             const settings = getStorageData('cloakSettings', {});
             const newTitle = settings.title || 'Google Drive';
             const newFavicon = settings.favicon || '📚';
+            const appWrapper = document.getElementById('appWrapper');
+            const favicon = document.getElementById('favicon');
             
+            if (!appWrapper || !favicon) return;
+
             if (!isCloaked) {
                 document.title = newTitle;
-                document.getElementById('favicon').href = newFavicon;
-                document.getElementById('appWrapper').style.display = 'none';
+                favicon.href = newFavicon;
+                appWrapper.style.display = 'none';
                 isCloaked = true;
                 customAlert(`Cloaked! Title: ${newTitle}, Favicon: ${newFavicon}`, 'Panic Mode Activated', 'warning');
             } else {
                 document.title = 'Unblocked Game Hub';
-                document.getElementById('favicon').href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>';
-                document.getElementById('appWrapper').style.display = 'block';
+                favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>';
+                appWrapper.style.display = 'block';
                 isCloaked = false;
                 customAlert('Uncloaked!', 'Panic Mode Deactivated', 'info');
             }
         }
         
         function saveCloakSettings() {
-            const title = document.getElementById('cloakTitleInput').value.trim();
-            const favicon = document.getElementById('cloakFaviconInput').value.trim();
+            const titleInput = document.getElementById('cloakTitleInput');
+            const faviconInput = document.getElementById('cloakFaviconInput');
+            if (!titleInput || !faviconInput) return;
+            
+            const title = titleInput.value.trim();
+            const favicon = faviconInput.value.trim();
             setStorageData('cloakSettings', { title, favicon });
             customAlert('Cloak settings saved!', 'Settings Updated', 'success');
         }
 
         function updateUserProfileUI() {
-            document.getElementById('userProfileAvatar').textContent = hubUser.avatar;
-            document.getElementById('userProfileName').textContent = hubUser.nickname;
+            const avatar = document.getElementById('userProfileAvatar');
+            const name = document.getElementById('userProfileName');
+            if (avatar) avatar.textContent = hubUser.avatar;
+            if (name) name.textContent = hubUser.nickname;
         }
 
         function openUserProfileModal() {
+            if (!userNicknameInput || !userProfileModal) return;
             userNicknameInput.value = hubUser.nickname;
             userProfileModal.classList.remove('hidden');
             renderAvatarGrid();
@@ -1005,6 +1075,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function renderAvatarGrid() {
             const grid = document.getElementById('userAvatarGrid');
+            if (!grid) return;
             const avatars = ['🎮', '🚀', '⭐', '👽', '👾', '🤖', '👑', '🐱', '🐶', '🍕', '⚽', '🏀', '🎸', '📚', '🧪', '💡'];
 
             grid.innerHTML = avatars.map(av => `
@@ -1023,8 +1094,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function saveUserProfile() {
+            if (!userNicknameInput || !userProfileModal) return;
+            
             const newNickname = userNicknameInput.value.trim() || 'Player';
-            const newAvatar = hubUser.avatar; // Gets updated by the grid click handler
+            const newAvatar = hubUser.avatar;
 
             hubUser = { nickname: newNickname, avatar: newAvatar };
             updateUserProfileUI();
@@ -1047,7 +1120,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (themeToggle) themeToggle.onclick = toggleTheme;
         
         // Mobile Menu
-        if (mobileMenuButton) mobileMenuButton.onclick = () => mobileNav.classList.toggle('hidden');
+        if (mobileMenuButton) mobileMenuButton.onclick = () => {
+             if (mobileNav) mobileNav.classList.toggle('hidden');
+        }
 
         // Game Modal Listeners
         if (modalCloseBtn) modalCloseBtn.onclick = closeGameModal;
@@ -1061,9 +1136,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Game Interaction Buttons
-        if (modalLikeBtn) modalLikeBtn.onclick = () => updateGameStats(modalLikeBtn.closest('#gameModal').querySelector('iframe').src.split('/').pop().split('.').shift(), 'like');
-        if (modalDislikeBtn) modalDislikeBtn.onclick = () => updateGameStats(modalDislikeBtn.closest('#gameModal').querySelector('iframe').src.split('/').pop().split('.').shift(), 'dislike');
-        if (modalFavoriteBtn) modalFavoriteBtn.onclick = () => toggleFavorite(modalFavoriteBtn.closest('#gameModal').querySelector('iframe').src.split('/').pop().split('.').shift());
+        if (modalLikeBtn) modalLikeBtn.onclick = () => {
+            const gameId = extractGameIdFromIframe();
+            if (gameId) updateGameStats(gameId, 'like');
+        };
+        if (modalDislikeBtn) modalDislikeBtn.onclick = () => {
+            const gameId = extractGameIdFromIframe();
+            if (gameId) updateGameStats(gameId, 'dislike');
+        };
+        if (modalFavoriteBtn) modalFavoriteBtn.onclick = () => {
+            const gameId = extractGameIdFromIframe();
+            if (gameId) toggleFavorite(gameId);
+        };
         
         // Game Card Click Handler
         document.addEventListener('click', (e) => {
@@ -1074,10 +1158,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     toggleFavorite(card.dataset.gameId);
                     return;
                 }
-                // If the click target is a tag, filter games
+                // If the click target is a tag, filter games (For future use)
                 if (e.target.closest('.tag-filter-btn')) {
-                    // Implement tag filtering logic here if needed, for now just show a message
-                    customAlert(`Filtering by tag: ${e.target.dataset.tag}`, "Filter", "info");
+                    customAlert(`Filtering by tag: ${e.target.dataset.tag} (Feature not yet fully implemented)`, "Filter", "info");
                     return;
                 }
                 // Otherwise, open the game modal
@@ -1088,10 +1171,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // User Profile Modal
         if (userProfileButton) userProfileButton.onclick = openUserProfileModal;
         if (userProfileSaveBtn) userProfileSaveBtn.onclick = saveUserProfile;
-        if (userProfileCancelBtn) userProfileCancelBtn.onclick = () => userProfileModal.classList.add('hidden');
+        if (userProfileCancelBtn) userProfileCancelBtn.onclick = () => {
+             if (userProfileModal) userProfileModal.classList.add('hidden');
+        };
 
         // Settings Modal
-        if (settingsButton) settingsButton.onclick = () => settingsModal.classList.remove('hidden');
+        if (settingsButton) settingsButton.onclick = () => {
+             if (settingsModal) settingsModal.classList.remove('hidden');
+        };
         if (settingsSaveBtn) settingsSaveBtn.onclick = () => {
              // Save hub description
              if (hubDescriptionInput && settings.hubDescription !== hubDescriptionInput.value) {
@@ -1099,11 +1186,17 @@ document.addEventListener('DOMContentLoaded', () => {
                  updateDoc(settingsRef, { hubDescription: hubDescriptionInput.value.trim() })
                     .catch(err => customAlert(`Error saving description: ${err.message}`, "Error", "error"));
              }
-             settingsModal.classList.add('hidden');
+             if (settingsModal) settingsModal.classList.add('hidden');
         };
+        
+        // Safety Features
         if (panicButton) panicButton.onclick = handlePanic;
         if (saveCloakSettingsBtn) saveCloakSettingsBtn.onclick = saveCloakSettings;
-        
+        document.body.onkeyup = (e) => {
+             if (e.key === 'f' || e.key === 'F') handlePanic();
+        };
+
+
         // Admin: Login
         if (adminLoginBtn) adminLoginBtn.onclick = handleAdminLogin;
 
@@ -1121,7 +1214,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Admin: Data
         if (exportDataBtn) exportDataBtn.onclick = exportData;
-        if (importDataBtn) importDataBtn.onclick = () => importFileInput.click();
+        if (importDataBtn) importDataBtn.onclick = () => {
+             if (importFileInput) importFileInput.click();
+        };
         if (importFileInput) importFileInput.onchange = (e) => {
             if (e.target.files.length > 0) {
                 importData(e.target.files[0]);
@@ -1133,14 +1228,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("App initialization process started.");
         
     } catch (err) {
-        console.error("A fatal error occurred during initialization:", err);
-        // Show a user-friendly error message
+        console.error("A fatal error occurred during DOMContentLoaded:", err);
+        // Robustly show a user-friendly error message on the loading screen
         const loadingModal = document.getElementById('loadingModal');
         if (loadingModal) {
             loadingModal.innerHTML = `
                 <div class="p-4 bg-red-800 border-4 border-red-500 rounded-lg">
-                    <h2 class="text-xl font-bold text-white">Error: Could not load the application.</h2>
-                    <p class="mt-2 text-red-100">Check the console (F12) for details.</p>
+                    <h2 class="text-xl font-bold text-white">Error: Initialization Failed.</h2>
+                    <p class="mt-2 text-red-100">See console for: ${err.message}</p>
                 </div>`;
         }
     }
