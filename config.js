@@ -23,7 +23,7 @@ const CONFIG = {
     RATE_LIMIT_ACTIONS: 50,
     
     // Security
-    ADMIN_PASS_HASH: 'bXlwYXNz', // btoa('mypass') - CHANGE THIS!
+    ADMIN_PASS_HASH: '2025', // btoa('mypass') - CHANGE THIS!
     SANDBOX_IFRAME: true,
     
     // UI
