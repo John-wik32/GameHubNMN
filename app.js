@@ -280,6 +280,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- THEME FUNCTIONS (Added back in) ---
+
+    /**
+     * Applies the theme (light/dark) to the <html> tag.
+     * @param {'light'|'dark'} theme - The theme to apply.
+     * @param {boolean} [isInitialLoad=false] - Whether this is the first load.
+     */
+    function applyTheme(theme, isInitialLoad = false) {
+        if (theme === 'dark') {
+            doc.classList.add('dark');
+        } else {
+            doc.classList.remove('dark');
+        }
+        // Update the icon *unless* it's the first page load
+        if (!isInitialLoad) {
+            updateThemeToggleUI(theme);
+        }
+    }
+
+    /**
+     * Updates the theme toggle button's icon based on the current theme.
+     */
+    function updateThemeToggleUI(theme) {
+        const themeToUse = theme || currentTheme;
+        if (themeToggle) {
+            const icon = themeToggle.querySelector('i');
+            if (icon) {
+                if (themeToUse === 'dark') {
+                    icon.setAttribute('data-lucide', 'moon');
+                } else {
+                    icon.setAttribute('data-lucide', 'sun');
+                }
+                lucide.createIcons(); // Redraw the icon
+            }
+        }
+    }
+
+    /**
+     * Toggles the theme between light and dark and saves the preference.
+     */
+    function toggleTheme() {
+        currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+        setStorageData('currentTheme', currentTheme);
+        applyTheme(currentTheme, false); // 'false' = this is not the initial load
+    }
+
 
     // --- INITIALIZATION ---
 
@@ -314,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Load and apply theme
         currentTheme = getStorageData('currentTheme', 'light');
         applyTheme(currentTheme, true); // true = on initial load
+        updateThemeToggleUI(); // Set the icon correctly on load
 
         // Render user profile button
         renderUserProfile();
