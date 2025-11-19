@@ -238,7 +238,7 @@ function initialize() {
     applyTheme(currentTheme, true);
     updateThemeToggleUI(); // Set the icon correctly on load
 
-    renderUserProfile();
+    updateUserProfileUI();
 
     // Update "auth" status
     authMessage.textContent = `Local Storage`;
