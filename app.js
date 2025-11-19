@@ -1,13 +1,170 @@
-// app.js - Main application logic
-import CONFIG from './config.js';
-import Utils from './utils.js';
+// ==========================================
+// CONFIGURATION
+// ==========================================
+const CONFIG = {
+    APP_NAME: 'Unblocked Game Hub',
+    VERSION: '2.0.0',
+    
+    // Feature Flags
+    FEATURES: {
+        RANDOM_GAME: true,
+        RECENTLY_PLAYED: true,
+        GAME_REPORTING: true,
+        GAME_OF_DAY: true,
+        PWA_SUPPORT: false, // Disable if not using HTTPS
+        ANALYTICS: true,
+        FULLSCREEN_BUTTON: true,
+    },
+    
+    // Limits & Settings
+    NEW_GAME_DAYS: 7,
+    LOCAL_RECENT_LIMIT: 5,
+    GLOBAL_RECENT_LIMIT: 10,
+    SEARCH_DEBOUNCE_MS: 300,
+    RATE_LIMIT_ACTIONS: 50,
+    
+    // Security (CHANGE THIS!)
+    ADMIN_PASS_HASH: 'bXlwYXNz', // btoa('mypass')
+    
+    // UI
+    ACCENT_COLORS: {
+        'Blue': { hex: '#3b82f6', rgb: '59, 130, 246' },
+        'Green': { hex: '#10b981', rgb: '16, 185, 129' },
+        'Purple': { hex: '#8b5cf6', rgb: '139, 92, 246' },
+        'Red': { hex: '#ef4444', rgb: '239, 68, 68' },
+    },
+    
+    AVATARS: ['🎮', '👾', '🚀', '🤖', '🐱', '🐶', '🍕', '⚽', '👑', '🧙'],
+    
+    // Default Games
+    DEFAULT_GAMES: {
+        'g_subway_surfers': {
+            title: 'Subway Surfers',
+            url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/subway-surfers.html',
+            image: 'https://placehold.co/400x300/f87171/ffffff?text=Subway+Surfers',
+            description: 'Run and dodge trains in this endless runner classic!',
+            section: 'featured',
+            tags: ['runner', 'mobile', 'action'],
+            controls: 'Arrow Keys: Move • Space: Jump',
+            created: '2024-10-20T10:00:00.000Z'
+        },
+        'g_slope': {
+            title: 'Slope',
+            url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/slope.html',
+            image: 'https://placehold.co/400x300/4f46e5/ffffff?text=Slope',
+            description: 'Guide a ball down a steep slope, avoid obstacles, and set a high score.',
+            section: 'recommended',
+            tags: ['3d', 'skill', 'endless'],
+            controls: 'Arrow Keys: Steer',
+            created: '2024-10-25T10:00:00.000Z'
+        },
+        'g_penalty_kicks': {
+            title: 'Penalty Kicks (Flash)',
+            url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/penalty-kicks.swf',
+            image: 'https://placehold.co/400x300/1e40af/ffffff?text=Penalty+Kicks',
+            description: 'Test your nerve and accuracy in this classic soccer penalty shootout game.',
+            section: 'sports',
+            tags: ['sports', 'soccer', 'flash'],
+            controls: 'Mouse: Aim • Click: Shoot',
+            created: '2024-11-18T10:00:00.000Z'
+        },
+    },
+};
 
-// --- STATE MANAGER ---
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+const Utils = {
+    // Safe localStorage get
+    getStorageData(key, defaultValue) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : defaultValue;
+        } catch (e) {
+            console.error(`Storage get error for ${key}:`, e);
+            return defaultValue;
+        }
+    },
+    
+    // Safe localStorage set
+    setStorageData(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.error(`Storage set error for ${key}:`, e);
+        }
+    },
+    
+    // Safe DOM creation
+    createElement(tag, props = {}, children = []) {
+        const el = document.createElement(tag);
+        Object.entries(props).forEach(([key, value]) => {
+            if (key === 'className') el.className = value;
+            else if (key === 'textContent') el.textContent = value;
+            else if (key === 'innerHTML') el.innerHTML = value;
+            else el.setAttribute(key, value);
+        });
+        children.forEach(child => el.appendChild(child));
+        return el;
+    },
+    
+    // URL validation
+    isValidUrl(string) {
+        try {
+            const url = new URL(string);
+            return ['http:', 'https:'].includes(url.protocol);
+        } catch {
+            return false;
+        }
+    },
+    
+    // Debounce utility
+    debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    },
+    
+    // Format numbers
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    },
+    
+    // Rate limiting
+    checkRateLimit(action, limit = CONFIG.RATE_LIMIT_ACTIONS) {
+        const key = `ratelimit_${State.data.user.nickname}_${action}`;
+        const count = parseInt(localStorage.getItem(key) || '0');
+        if (count >= limit) {
+            customAlert('Slow down! Too many actions.', "Rate Limited", "error");
+            return false;
+        }
+        localStorage.setItem(key, (count + 1).toString());
+        setTimeout(() => {
+            const current = parseInt(localStorage.getItem(key) || '0');
+            localStorage.setItem(key, Math.max(0, current - 1));
+        }, 3600000); // Reset after 1 hour
+        return true;
+    },
+};
+
+// ==========================================
+// STATE MANAGER
+// ==========================================
 const State = {
     data: {
         games: {},
         settings: {},
-        stats: { counts: {}, recent: [], ratings: { like: {}, dislike: {} }, reports: {}, requests: [] },
+        stats: { 
+            counts: {}, 
+            recent: [],
+            ratings: { like: {}, dislike: {} },
+            reports: {},
+            requests: [],
+        },
         user: { nickname: 'Player', avatar: '🎮' },
         favorites: [],
         notes: {},
@@ -16,7 +173,7 @@ const State = {
     },
     
     load() {
-        this.data.games = Utils.getStorageData('hubGames', {});
+        this.data.games = Utils.getStorageData('hubGames', CONFIG.DEFAULT_GAMES);
         this.data.settings = Utils.getStorageData('hubSettings', {
             theme: 'light', 
             accent: 'Blue', 
@@ -30,6 +187,13 @@ const State = {
         this.data.notes = Utils.getStorageData('myGameNotes', {});
         this.data.ratings = Utils.getStorageData('myGameRatings', {});
         this.data.recent = Utils.getStorageData('localRecent', []);
+        
+        // Ensure stats structure
+        this.data.stats.counts = this.data.stats.counts || {};
+        this.data.stats.recent = this.data.stats.recent || [];
+        this.data.stats.ratings = this.data.stats.ratings || { like: {}, dislike: {} };
+        this.data.stats.reports = this.data.stats.reports || {};
+        this.data.stats.requests = this.data.stats.requests || [];
     },
     
     save() {
@@ -44,9 +208,10 @@ const State = {
     },
 };
 
-// --- XSS-SAFE RENDERER ---
+// ==========================================
+// RENDERER
+// ==========================================
 const Renderer = {
-    // Render game card with safe DOM methods
     gameCard(gameId) {
         const game = State.data.games[gameId];
         if (!game) return document.createElement('div');
@@ -70,7 +235,7 @@ const Renderer = {
             src: game.image,
             alt: game.title,
             className: 'w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-80',
-            loading: 'lazy', // Performance
+            loading: 'lazy',
         });
         img.onerror = () => img.src = 'https://placehold.co/400x300/4f46e5/ffffff?text=Image+Missing';
         imgContainer.appendChild(img);
@@ -117,19 +282,17 @@ const Renderer = {
             className: 'flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-700',
         });
         
-        // Play count
         const playCount = Utils.createElement('div', {
             className: 'flex items-center text-sm text-gray-500 dark:text-gray-400',
         });
         playCount.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${State.data.stats.counts[gameId] || 0}</span>`;
         
-        // Rating buttons
         const ratingBtns = Utils.createElement('div', {
             className: 'flex items-center space-x-3',
         });
         
-        const likeBtn = this.ratingButton('like', likeCount, userRating === 'like', gameId);
-        const dislikeBtn = this.ratingButton('dislike', dislikeCount, userRating === 'dislike', gameId);
+        const likeBtn = this._ratingButton('like', likeCount, userRating === 'like', gameId);
+        const dislikeBtn = this._ratingButton('dislike', dislikeCount, userRating === 'dislike', gameId);
         
         ratingBtns.appendChild(likeBtn);
         ratingBtns.appendChild(dislikeBtn);
@@ -144,7 +307,7 @@ const Renderer = {
         card.appendChild(imgContainer);
         card.appendChild(content);
         
-        // Click handler for opening modal
+        // Click handler
         card.addEventListener('click', (e) => {
             if (!e.target.closest('button')) {
                 Actions.openGameModal(gameId);
@@ -154,7 +317,7 @@ const Renderer = {
         return card;
     },
     
-    ratingButton(type, count, isActive, gameId) {
+    _ratingButton(type, count, isActive, gameId) {
         const btn = Utils.createElement('button', {
             className: `flex items-center text-sm ${isActive ? (type === 'like' ? 'text-accent fill-accent' : 'text-red-500 fill-red-500') : 'text-gray-400 dark:text-gray-500 hover:text-accent'}`,
         });
@@ -166,7 +329,6 @@ const Renderer = {
         return btn;
     },
     
-    // Render tag filters with proper active state
     tagFilters() {
         const container = $('tagFilters');
         if (!container) return;
@@ -176,7 +338,6 @@ const Renderer = {
             (game.tags || []).forEach(tag => allTags.add(tag));
         });
         
-        // Update currentTags array of objects
         window.currentTags = Array.from(allTags).sort().map(tag => ({
             name: tag,
             active: window.currentTags?.find(t => t.name === tag)?.active || false
@@ -210,12 +371,13 @@ const Renderer = {
         });
     },
     
-    // Render all sections
     pageContent() {
         const container = $('gameContent');
         if (!container) return;
         
-        // Add Recently Played section first if enabled
+        container.innerHTML = '';
+        
+        // Recently Played Section
         if (CONFIG.FEATURES.RECENTLY_PLAYED && State.data.recent.length > 0) {
             const recentSection = Utils.createElement('section', { className: 'game-section mb-12' });
             const title = Utils.createElement('h2', {
@@ -235,9 +397,9 @@ const Renderer = {
             container.appendChild(recentSection);
         }
         
-        // Process and render games by section
+        // Process and render games
         const gamesArray = Object.keys(State.data.games).map(id => ({ ...State.data.games[id], id }));
-        const processed = this.processGames(gamesArray);
+        const processed = this._processGames(gamesArray);
         
         const sections = processed.reduce((acc, game) => {
             const sectionName = game.section || 'other';
@@ -246,7 +408,7 @@ const Renderer = {
             return acc;
         }, {});
         
-        const sectionOrder = ['featured', 'recommended', 'sports', 'other'];
+        const sectionOrder = ['featured', 'recommended', 'sports', 'puzzle', 'action', 'other'];
         
         sectionOrder.forEach(sectionKey => {
             const sectionGames = sections[sectionKey];
@@ -280,11 +442,15 @@ const Renderer = {
             `;
         }
         
+        // Update quick stats
+        $('totalGames').textContent = `${Object.keys(State.data.games).length} Games`;
+        $('totalPlays').textContent = `${Utils.formatNumber(Object.values(State.data.stats.counts).reduce((a,b) => a+b, 0))} Plays`;
+        $('favoriteCount').textContent = `${State.data.favorites.length} Favorites`;
+        
         lucide.createIcons();
     },
     
-    // Process games with filters and sorting
-    processGames(games) {
+    _processGames(games) {
         let processed = [...games];
         
         // Filter by active tags
@@ -314,6 +480,9 @@ const Renderer = {
             case 'mostPlayed':
                 processed.sort((a, b) => (State.data.stats.counts[b.id] || 0) - (State.data.stats.counts[a.id] || 0));
                 break;
+            case 'random':
+                processed.sort(() => Math.random() - 0.5);
+                break;
             default:
                 processed.sort((a, b) => a.title.localeCompare(b.title));
         }
@@ -328,14 +497,12 @@ const Renderer = {
     },
 };
 
-// --- ACTIONS ---
+// ==========================================
+// ACTIONS
+// ==========================================
 const Actions = {
-    // Open game modal with enhanced features
     openGameModal(gameId) {
-        if (!Utils.checkRateLimit('playGame')) {
-            customAlert('Slow down! Too many actions.', "Rate Limited", "error");
-            return;
-        }
+        if (!Utils.checkRateLimit('playGame')) return;
         
         const game = State.data.games[gameId];
         if (!game) return;
@@ -349,18 +516,20 @@ const Actions = {
         $('modalTitle').textContent = game.title;
         $('modalDescription').textContent = game.description;
         
+        // Controls
+        $('modalControls').textContent = game.controls || 'No controls listed';
+        
         // Tags
         const tagsEl = $('modalTags');
         tagsEl.innerHTML = '';
         (game.tags || []).forEach(tag => {
-            const tagSpan = Utils.createElement('span', {
+            tagsEl.appendChild(Utils.createElement('span', {
                 className: 'text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
                 textContent: tag,
-            });
-            tagsEl.appendChild(tagSpan);
+            }));
         });
         
-        // Load game with error handling
+        // Load game with spinner
         iframe.style.background = 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2I4MmY2IiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=) center no-repeat';
         
         if (game.url.endsWith('.swf')) {
@@ -371,14 +540,12 @@ const Actions = {
                     <style>
                         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1f2937; overflow: hidden; }
                         #ruffle-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-                        .error { color: white; font-family: Arial; padding: 20px; }
+                        .error { color: white; font-family: Arial; padding: 20px; text-align: center; }
                     </style>
                     <script src="https://unpkg.com/@ruffle-rs/ruffle@latest"><\/script>
                 </head>
                 <body>
-                    <div id="ruffle-container">
-                        <div class="error">Loading Flash game...</div>
-                    </div>
+                    <div id="ruffle-container"><div class="error">Loading Flash game...</div></div>
                     <script>
                         window.RufflePlayer = window.RufflePlayer || {};
                         window.addEventListener("load", () => {
@@ -392,8 +559,7 @@ const Actions = {
                                 document.getElementById('ruffle-container').appendChild(player);
                             } catch (e) {
                                 document.getElementById('ruffle-container').innerHTML = 
-                                    '<div class="error">Failed to load Flash content. Game may be incompatible.</div>';
-                                console.error("Ruffle error:", e);
+                                    '<div class="error">Failed to load Flash content. Game may be incompatible.<br><button onclick="window.parent.Actions.reportGame(\''${gameId}\', \'flash-error\')" class="mt-3 px-3 py-1 bg-red-500 rounded">Report</button></div>';
                             }
                         });
                     <\/script>
@@ -407,9 +573,9 @@ const Actions = {
         
         iframe.onload = () => iframe.style.background = '';
         iframe.onerror = () => {
-            iframe.srcdoc = `<div style="padding:40px;text-align:center;font-family:Arial;">
-                <h2 style="color:white;">Game Failed to Load</h2>
-                <button onclick="Actions.reportGame('${gameId}', 'broken')" 
+            iframe.srcdoc = `<div style="padding:40px;text-align:center;font-family:Arial;color:white;">
+                <h2>Game Failed to Load</h2>
+                <button onclick="window.parent.Actions.reportGame('${gameId}', 'broken')" 
                         style="margin-top:20px;padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:5px;cursor:pointer;">
                     Report Broken Game
                 </button>
@@ -417,8 +583,7 @@ const Actions = {
         };
         
         // Load note
-        const noteTextarea = $('modalNoteText');
-        noteTextarea.value = State.data.notes[gameId] || '';
+        $('modalNoteText').value = State.data.notes[gameId] || '';
         $('modalNoteArea').classList.toggle('hidden', !State.data.notes[gameId]);
         
         // Update stats
@@ -429,8 +594,8 @@ const Actions = {
         modal.classList.remove('opacity-0', 'pointer-events-none');
         modal.querySelector('.transform').classList.remove('scale-95');
         
-        // Request fullscreen option
-        if (CONFIG.FEATURES.FULLSCREEN) {
+        // Fullscreen button
+        if (CONFIG.FEATURES.FULLSCREEN_BUTTON) {
             const fullscreenBtn = Utils.createElement('button', {
                 className: 'p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-accent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors',
                 title: 'Fullscreen',
@@ -441,7 +606,6 @@ const Actions = {
         }
     },
     
-    // Report broken game
     reportGame(gameId, reason = 'broken') {
         State.data.stats.reports[gameId] = {
             reason,
@@ -453,11 +617,9 @@ const Actions = {
         customAlert('Game reported. Admin will review.', "Reported", "info");
     },
     
-    // Update stats with rate limiting
     updateGameStats(gameId) {
         State.data.stats.counts[gameId] = (State.data.stats.counts[gameId] || 0) + 1;
         
-        // Update recent lists
         State.data.recent = State.data.recent.filter(id => id !== gameId);
         State.data.recent.unshift(gameId);
         State.data.recent = State.data.recent.slice(0, CONFIG.LOCAL_RECENT_LIMIT);
@@ -470,7 +632,6 @@ const Actions = {
         this.updateModalStatsUI(gameId);
     },
     
-    // Toggle favorite with undo
     toggleFavorite(gameId) {
         const game = State.data.games[gameId];
         if (!game) return;
@@ -488,12 +649,8 @@ const Actions = {
         if (window.currentModalGameId === gameId) this.updateModalStatsUI(gameId);
     },
     
-    // Toggle rating with rate limiting
     toggleGameRating(gameId, type) {
-        if (!Utils.checkRateLimit('rateGame')) {
-            customAlert('Too many ratings. Please slow down.', "Rate Limited", "error");
-            return;
-        }
+        if (!Utils.checkRateLimit('rateGame')) return;
         
         const game = State.data.games[gameId];
         if (!game) return;
@@ -501,12 +658,10 @@ const Actions = {
         const currentRating = State.data.ratings[gameId];
         const newRating = currentRating === type ? null : type;
         
-        // Remove old rating
         if (currentRating) {
             delete State.data.stats.ratings[currentRating][gameId];
         }
         
-        // Add new rating
         if (newRating) {
             State.data.ratings[gameId] = newRating;
             State.data.stats.ratings[newRating][gameId] = true;
@@ -521,7 +676,6 @@ const Actions = {
         if (window.currentModalGameId === gameId) this.updateModalStatsUI(gameId);
     },
     
-    // Update modal UI elements
     updateModalStatsUI(gameId) {
         const el = {
             statsCount: $('modalStatsCount'),
@@ -532,10 +686,7 @@ const Actions = {
             noteArea: $('modalNoteArea'),
         };
         
-        if (Object.values(el).some(e => !e)) {
-            console.warn("Modal elements not ready");
-            return;
-        }
+        if (Object.values(el).some(e => !e)) return;
         
         const game = State.data.games[gameId];
         const isFav = State.data.favorites.includes(gameId);
@@ -545,23 +696,18 @@ const Actions = {
         const hasNote = !!State.data.notes[gameId];
         
         el.statsCount.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${Utils.formatNumber(State.data.stats.counts[gameId] || 0)}</span>`;
-        
         el.favBtn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
         el.favBtn.title = isFav ? 'Remove from Favorites' : 'Add to Favorites';
-        
         el.likeBtn.innerHTML = `<i data-lucide="thumbs-up" class="w-5 h-5 ${userRating === 'like' ? 'fill-accent text-accent' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${likeCount}</span>`;
         el.likeBtn.title = userRating === 'like' ? 'Remove Like' : 'Like Game';
-        
         el.dislikeBtn.innerHTML = `<i data-lucide="thumbs-down" class="w-5 h-5 ${userRating === 'dislike' ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${dislikeCount}</span>`;
         el.dislikeBtn.title = userRating === 'dislike' ? 'Remove Dislike' : 'Dislike Game';
-        
         el.noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 ${hasNote ? 'fill-yellow-400 text-yellow-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
         el.noteBtn.title = hasNote ? 'Edit Note (Saved)' : 'Add Note';
         
         lucide.createIcons();
     },
     
-    // Save note
     saveNote(gameId) {
         const note = $('modalNoteText').value.trim();
         if (note) {
@@ -575,7 +721,6 @@ const Actions = {
         this.updateModalStatsUI(gameId);
     },
     
-    // Random game
     playRandomGame() {
         const ids = Object.keys(State.data.games);
         if (ids.length === 0) return;
@@ -583,7 +728,6 @@ const Actions = {
         this.openGameModal(randomId);
     },
     
-    // Export data
     exportData() {
         const data = {
             games: State.data.games,
@@ -609,7 +753,6 @@ const Actions = {
         customAlert('Data exported successfully!', "Export Complete", "success");
     },
     
-    // Import data with confirmation
     importData(file) {
         if (!confirm('⚠️ This will OVERWRITE all existing data. Continue?')) return;
         
@@ -617,12 +760,12 @@ const Actions = {
         reader.onload = (e) => {
             try {
                 const imported = JSON.parse(e.target.result);
-                if (!confirm(`Import ${Object.keys(imported.games || {}).length} games and overwrite all settings?`)) return;
+                if (!confirm(`Import ${Object.keys(imported.games || {}).length} games?`)) return;
                 
                 State.data = { ...State.data, ...imported };
                 State.save();
                 initialize();
-                customAlert('Data imported successfully! Hub reloaded.', "Import Complete", "success");
+                customAlert('Data imported! Hub reloaded.', "Import Complete", "success");
             } catch (error) {
                 console.error("Import error:", error);
                 customAlert(`Import failed: ${error.message}`, "Error", "error");
@@ -632,12 +775,8 @@ const Actions = {
         $('importFileInput').value = '';
     },
     
-    // Admin: Add/edit game with validation
     saveGame(formData) {
-        if (!Utils.checkRateLimit('saveGame', 5)) {
-            customAlert('Too many saves. Slow down.', "Rate Limited", "error");
-            return;
-        }
+        if (!Utils.checkRateLimit('saveGame', 5)) return;
         
         const id = formData.get('id');
         const title = formData.get('title').trim();
@@ -648,13 +787,12 @@ const Actions = {
         const section = formData.get('section') || 'other';
         const controls = formData.get('controls')?.trim();
         
-        // Validation
         if (!title || !url) {
             customAlert('Title and URL are required.', "Validation Error", "error");
             return;
         }
         if (!Utils.isValidUrl(url)) {
-            customAlert('Invalid game URL. Must be http:// or https://', "Validation Error", "error");
+            customAlert('Invalid game URL.', "Validation Error", "error");
             return;
         }
         if (image && !Utils.isValidUrl(image)) {
@@ -678,18 +816,37 @@ const Actions = {
         State.save();
         
         customAlert(`Game "${title}" ${id ? 'updated' : 'added'}!`, "Success", "success");
-        clearAddForm();
+        $('addGameForm').reset();
+        $('gameIdInput').value = '';
         initialize();
     },
 };
 
-// --- EVENT LISTENERS ---
+// ==========================================
+// EVENT LISTENERS & INITIALIZATION
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        // Initialize state
         State.load();
         
-        // DOM cache
+        // Game of the Day
+        if (CONFIG.FEATURES.GAME_OF_DAY) {
+            const today = new Date().toDateString();
+            const lastFeatured = Utils.getStorageData('lastFeatured', '');
+            if (lastFeatured !== today) {
+                const ids = Object.keys(State.data.games);
+                if (ids.length > 0) {
+                    const randomId = ids[Math.floor(Math.random() * ids.length)];
+                    Utils.setStorageData('gameOfTheDay', randomId);
+                    Utils.setStorageData('lastFeatured', today);
+                    setTimeout(() => {
+                        customAlert(`🎮 Game of the Day: ${State.data.games[randomId].title}!`, "Featured", "info");
+                    }, 2000);
+                }
+            }
+        }
+        
+        // DOM elements cache
         const DOM = {
             search: $('searchInput'),
             sort: $('sortSelect'),
@@ -697,10 +854,6 @@ document.addEventListener('DOMContentLoaded', () => {
             container: $('appContainer'),
             modal: $('gameModal'),
             iframe: $('modalGameIframe'),
-            noteText: $('modalNoteText'),
-            noteArea: $('modalNoteArea'),
-            profileBtn: $('profileBtn'),
-            settingsBtn: $('settingsBtn'),
         };
         
         // Debounced search
@@ -714,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Renderer.renderAll();
         };
         
-        // Panic button with custom key
+        // Panic button
         DOM.panic.onclick = () => Actions.toggleCloak();
         document.addEventListener('keydown', (e) => {
             if (e.key === State.data.settings.panicKey && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
@@ -723,12 +876,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Modal event listeners
-        $('closeModalBtn').onclick = () => Actions.closeGameModal();
-        $('modalNoteBtn').onclick = () => DOM.noteArea.classList.toggle('hidden');
+        // Modal listeners
+        $('closeModalBtn').onclick = () => closeGameModal();
+        $('modalNoteBtn').onclick = () => $('modalNoteArea').classList.toggle('hidden');
         $('modalNoteSaveBtn').onclick = () => Actions.saveNote(window.currentModalGameId);
-        
-        // Rating buttons
         $('modalLikeBtn').onclick = () => Actions.toggleGameRating(window.currentModalGameId, 'like');
         $('modalDislikeBtn').onclick = () => Actions.toggleGameRating(window.currentModalGameId, 'dislike');
         $('modalFavoriteBtn').onclick = () => Actions.toggleFavorite(window.currentModalGameId);
@@ -736,27 +887,193 @@ document.addEventListener('DOMContentLoaded', () => {
         // Random game button
         if (CONFIG.FEATURES.RANDOM_GAME) {
             const randomBtn = Utils.createElement('button', {
-                className: 'p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors',
+                className: 'p-2 absolute right-2 top-1/2 transform -translate-y-1/2',
                 title: 'Random Game',
-                innerHTML: '<i data-lucide="dice" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>',
+                innerHTML: '<i data-lucide="dice" class="w-5 h-5 text-gray-400"></i>',
             });
             randomBtn.onclick = () => Actions.playRandomGame();
-            $('searchInput').parentNode.appendChild(randomBtn);
+            DOM.search.parentNode.appendChild(randomBtn);
         }
         
-        // Escape key to close modals
+        // Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (window.currentModalGameId) Actions.closeGameModal();
-                if ($('profileModal').classList.contains('pointer-events-none') === false) closeProfileModal();
-                if ($('settingsModal').classList.contains('pointer-events-none') === false) closeSettingsModal();
+                if (window.currentModalGameId) closeGameModal();
+                if (!$('profileModal').classList.contains('pointer-events-none')) $('profileModal').classList.add('opacity-0', 'pointer-events-none');
+                if (!$('settingsModal').classList.contains('pointer-events-none')) $('settingsModal').classList.add('opacity-0', 'pointer-events-none');
             }
         });
         
+        // Profile modal
+        $('profileBtn').onclick = () => {
+            $('userNicknameInput').value = State.data.user.nickname;
+            const avatarGrid = $('userAvatarGrid');
+            avatarGrid.innerHTML = '';
+            CONFIG.AVATARS.forEach(avatar => {
+                const btn = Utils.createElement('button', {
+                    className: `avatar-btn ${State.data.user.avatar === avatar ? 'active' : ''}`,
+                    textContent: avatar,
+                });
+                btn.onclick = () => {
+                    avatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                };
+                avatarGrid.appendChild(btn);
+            });
+            $('panicKeySelect').value = State.data.settings.panicKey;
+            $('profileModal').classList.remove('opacity-0', 'pointer-events-none');
+        };
+        
+        $('userProfileSaveBtn').onclick = () => {
+            const newNickname = $('userNicknameInput').value.trim();
+            const activeAvatar = $('userAvatarGrid').querySelector('.avatar-btn.active')?.textContent;
+            const newPanicKey = $('panicKeySelect').value;
+            
+            if (newNickname) {
+                State.data.user.nickname = newNickname;
+                State.data.user.avatar = activeAvatar || State.data.user.avatar;
+                State.data.settings.panicKey = newPanicKey;
+                State.save();
+                customAlert('Profile saved!', "Success", "success");
+                renderNavigation();
+                $('profileModal').classList.add('opacity-0', 'pointer-events-none');
+            }
+        };
+        
+        $('userProfileCancelBtn').onclick = () => {
+            $('profileModal').classList.add('opacity-0', 'pointer-events-none');
+        };
+        
+        // Settings modal
+        $('settingsBtn').onclick = () => {
+            // Setup general tab
+            $(State.data.settings.theme === 'dark' ? 'themeDark' : 'themeLight').checked = true;
+            $('cloakTitleInput').value = State.data.settings.cloakTitle;
+            $('cloakFaviconInput').value = State.data.settings.cloakFavicon;
+            
+            // Accent colors
+            const colorGrid = $('accentColorGrid');
+            colorGrid.innerHTML = '';
+            Object.entries(CONFIG.ACCENT_COLORS).forEach(([name, color]) => {
+                const btn = Utils.createElement('button', {
+                    className: `w-10 h-10 rounded-full border-4 ${State.data.settings.accent === name ? 'border-gray-900 dark:border-white' : 'border-transparent'}`,
+                    style: `background-color: ${color.hex}`,
+                    title: name,
+                });
+                btn.onclick = () => updateAccentColor(name);
+                colorGrid.appendChild(btn);
+            });
+            
+            // Check admin status
+            if (sessionStorage.getItem('isAdmin') === 'true') {
+                $('adminLoginArea').classList.add('hidden');
+                $('adminToolsArea').classList.remove('hidden');
+                renderAdminTools();
+            } else {
+                $('adminLoginArea').classList.remove('hidden');
+                $('adminToolsArea').classList.add('hidden');
+            }
+            
+            $('settingsModal').classList.remove('opacity-0', 'pointer-events-none');
+        };
+        
+        $('settingsCloseBtn').onclick = () => {
+            $('settingsModal').classList.add('opacity-0', 'pointer-events-none');
+        };
+        
+        // Tab switching
+        $('tabGeneral').onclick = () => switchTab('General');
+        $('tabAdmin').onclick = () => switchTab('Admin');
+        $('tabAnalytics').onclick = () => {
+            switchTab('Analytics');
+            if (CONFIG.FEATURES.ANALYTICS) renderAnalytics();
+        };
+        
+        function switchTab(tab) {
+            const tabs = {
+                General: { button: $('tabGeneral'), content: $('contentGeneral') },
+                Admin: { button: $('tabAdmin'), content: $('contentAdmin') },
+                Analytics: { button: $('tabAnalytics'), content: $('contentAnalytics') },
+            };
+            
+            Object.entries(tabs).forEach(([name, { button, content }]) => {
+                if (name === tab) {
+                    button.classList.add('text-accent', 'border-accent');
+                    button.classList.remove('text-gray-500', 'dark:text-gray-400');
+                    content.classList.remove('hidden');
+                } else {
+                    button.classList.add('text-gray-500', 'dark:text-gray-400');
+                    button.classList.remove('text-accent', 'border-accent');
+                    content.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Admin login
+        $('adminLoginBtn').onclick = () => {
+            const input = $('adminPassInput').value;
+            if (btoa(input) === CONFIG.ADMIN_PASS_HASH) {
+                sessionStorage.setItem('isAdmin', 'true');
+                $('adminLoginArea').classList.add('hidden');
+                $('adminToolsArea').classList.remove('hidden');
+                renderAdminTools();
+                customAlert('Admin access granted!', "Welcome", "success");
+            } else {
+                customAlert('Incorrect password.', "Access Denied", "error");
+            }
+            $('adminPassInput').value = '';
+        };
+        
+        // Add game form
+        $('addGameForm').onsubmit = (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            Actions.saveGame(formData);
+        };
+        
+        $('clearFormBtn').onclick = () => {
+            $('addGameForm').reset();
+            $('gameIdInput').value = '';
+        };
+        
+        // Data management
+        $('exportDataBtn').onclick = () => Actions.exportData();
+        $('importDataBtn').onclick = () => $('importFileInput').click();
+        $('importFileInput').onchange = (e) => {
+            if (e.target.files.length > 0) {
+                Actions.importData(e.target.files[0]);
+            }
+        };
+        
+        $('backupBtn').onclick = () => {
+            Utils.setStorageData('backup_' + Date.now(), State.data);
+            customAlert('Backup created!', "Backup", "success");
+        };
+        
+        // Theme change
+        $('themeLight').onchange = () => updateTheme('light');
+        $('themeDark').onchange = () => updateTheme('dark');
+        
+        // Cloak settings
+        $('cloakTitleInput').oninput = (e) => {
+            State.data.settings.cloakTitle = e.target.value || 'Google Docs';
+            State.save();
+        };
+        $('cloakFaviconInput').oninput = (e) => {
+            State.data.settings.cloakFavicon = e.target.value.slice(0, 1) || '📄';
+            State.save();
+        };
+        
         // Initialize UI
+        window.currentTags = [];
+        window.currentSearchQuery = '';
+        window.currentGameSort = 'name';
+        window.currentModalGameId = null;
+        window.isCloaked = false;
+        
         initialize();
         
-        // Hide loading screen
+        // Hide loading
         setTimeout(() => {
             $('loadingModal').classList.add('opacity-0');
             setTimeout(() => $('loadingModal').classList.add('hidden'), 300);
@@ -765,27 +1082,33 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`${CONFIG.APP_NAME} v${CONFIG.VERSION} initialized successfully.`);
         
     } catch (err) {
-        console.error("Fatal initialization error:", err);
+        console.error("Fatal error:", err);
         $('loadingModal').innerHTML = `
             <div class="p-6 bg-red-800 border-4 border-red-500 rounded-lg text-white max-w-md">
                 <h2 class="text-2xl font-bold mb-2">💥 Critical Error</h2>
-                <p class="mb-4">Failed to load the application. Check console (F12) for details.</p>
+                <p class="mb-4">${err.message}</p>
                 <button onclick="location.reload()" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700">Reload</button>
             </div>`;
     }
 });
 
-// --- INITIALIZATION ---
+// ==========================================
+// GLOBAL FUNCTIONS
+// ==========================================
+function $(id) {
+    return document.getElementById(id);
+}
+
 function initialize() {
     // Apply theme
     updateTheme(State.data.settings.theme, false);
     updateAccentColor(State.data.settings.accent, false);
     
-    // Update document title and favicon
+    // Update title
     document.title = CONFIG.APP_NAME;
     $('appTitle').textContent = CONFIG.APP_NAME;
     
-    // Setup tag filters
+    // Setup tags from games
     const allTags = new Set();
     Object.values(State.data.games).forEach(game => {
         (game.tags || []).forEach(tag => allTags.add(tag));
@@ -796,15 +1119,10 @@ function initialize() {
     Renderer.renderAll();
     renderNavigation();
     
-    // Setup PWA if enabled
-    if (CONFIG.FEATURES.PWA_SUPPORT && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(() => {
-            console.log('PWA Service Worker registered');
-        }).catch(err => console.log('PWA not available:', err));
+    // PWA registration
+    if (CONFIG.FEATURES.PWA_SUPPORT && 'serviceWorker' in navigator && window.location.protocol === 'https:') {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA unavailable:', err));
     }
-    
-    // Check for updates (weekly)
-    checkForUpdates();
 }
 
 function renderNavigation() {
@@ -841,7 +1159,6 @@ function updateAccentColor(colorName, save = true) {
 function toggleCloak() {
     window.isCloaked = !window.isCloaked;
     const favicon = $('favicon');
-    const appTitle = $('appTitle');
     
     if (window.isCloaked) {
         document.title = State.data.settings.cloakTitle;
@@ -895,42 +1212,65 @@ function customAlert(message, title, type = 'success') {
     }, 3000);
 }
 
-function checkForUpdates() {
-    // Check if new games were added in the last week
-    const lastCheck = Utils.getStorageData('lastUpdateCheck', 0);
-    if (Date.now() - lastCheck > 7 * 24 * 60 * 60 * 1000) {
-        const newGames = Object.values(State.data.games).filter(g => 
-            (new Date() - new Date(g.created)) / (1000 * 60 * 60 * 24) < 7
-        ).length;
-        if (newGames > 0) {
-            customAlert(`${newGames} new games added this week!`, "Update", "info");
-        }
-        Utils.setStorageData('lastUpdateCheck', Date.now());
+function renderAdminTools() {
+    // Tag manager
+    const tagManager = $('tagManager');
+    if (tagManager) {
+        const tagCounts = {};
+        Object.values(State.data.games).forEach(game => {
+            (game.tags || []).forEach(tag => {
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            });
+        });
+        
+        tagManager.innerHTML = Object.entries(tagCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([tag, count]) => `
+                <div class="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                    <span>${tag} <span class="text-sm text-gray-500">(${count} games)</span></span>
+                    <button onclick="Actions.mergeTag('${tag}')" class="text-xs px-2 py-1 bg-yellow-500 text-white rounded">Merge</button>
+                </div>
+            `).join('');
     }
 }
-// In app.js DOMContentLoaded:
-if (CONFIG.FEATURES.SWIPE_GESTURES) {
-    const script = document.createElement('script');
-    script.src = 'https://hammerjs.github.io/dist/hammer.min.js';
-    script.onload = () => {
-        document.querySelectorAll('.game-card').forEach(card => {
-            const hammer = new Hammer(card);
-            hammer.on('swipeleft', () => Actions.toggleFavorite(card.dataset.gameId));
-        });
-    };
-    document.head.appendChild(script);
-}
-// In app.js, add to admin tab:
+
 function renderAnalytics() {
-    const totalPlays = Object.values(State.data.stats.counts).reduce((a,b) => a+b, 0);
+    if (!CONFIG.FEATURES.ANALYTICS) return;
+    
+    const totalPlays = Object.values(State.data.stats.counts).reduce((a, b) => a + b, 0);
     $('analyticsTotalPlays').textContent = Utils.formatNumber(totalPlays);
     $('analyticsTotalGames').textContent = Object.keys(State.data.games).length;
     
-    // Popular games list
+    // Popular games
     const popular = Object.entries(State.data.stats.counts)
-        .sort((a,b) => b[1] - a[1])
+        .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
-    $('popularGamesList').innerHTML = popular.map(([id, count]) => 
-        `<li>${State.data.games[id]?.title} - ${Utils.formatNumber(count)} plays</li>`
-    ).join('');
+    $('popularGamesList').innerHTML = popular.map(([id, count]) => `
+        <li>${State.data.games[id]?.title || 'Unknown'} - ${Utils.formatNumber(count)} plays</li>
+    `).join('');
+    
+    // Reported games
+    const reports = Object.entries(State.data.stats.reports || {});
+    $('reportedGamesList').innerHTML = reports.length ? reports.map(([id, report]) => `
+        <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded">
+            <strong>${State.data.games[id]?.title || 'Unknown'}</strong><br>
+            <small>Reason: ${report.reason} • Reported by ${report.user}</small>
+        </div>
+    `).join('') : '<p class="text-gray-500">No reports</p>';
 }
+
+// Merge tag function for admin
+Actions.mergeTag = function(oldTag) {
+    const newTag = prompt(`Merge "${oldTag}" into tag:`);
+    if (!newTag) return;
+    
+    Object.values(State.data.games).forEach(game => {
+        const idx = game.tags.indexOf(oldTag);
+        if (idx > -1) {
+            game.tags[idx] = newTag;
+        }
+    });
+    State.save();
+    customAlert(`Merged "${oldTag}" into "${newTag}"`, "Success", "success");
+    renderAdminTools();
+};
