@@ -1,1200 +1,910 @@
-// --- GLOBAL STATE ---
-let allGames = {};
-let settings = {};
-let stats = { 
-    counts: {}, 
-    recent: [],
-    ratings: { like: {}, dislike: {} }, // Stores all users' ratings globally
-    reports: {} 
-};
-let localRecent = []; // For storing recently played game IDs locally
-let myFavorites = []; // For storing favorite game IDs
-let myGameNotes = {}; // For private game notes
-let myGameRatings = {}; // Stores the current user's rating for each game
-let hubUser = { nickname: 'Player', avatar: '🎮' }; // User profile
-let currentTheme = 'light'; // For theme
-let isCloaked = false; // For panic button
-let currentTags = []; // For tag filtering
-let currentGameSort = 'name'; // For sorting
-let currentSearchQuery = ''; // For searching
-let currentGameUrl = null; // For game modal
-let currentModalGameId = null; // Stores the ID of the game currently in the modal
-const NEW_GAME_DAYS = 7; // How many days a game counts as "new"
-const ADMIN_PASS = '2025'; // The admin password
+// app.js - Main application logic
+import CONFIG from './config.js';
+import Utils from './utils.js';
 
-// --- LOCALSTORAGE HELPER FUNCTIONS ---
-
-/**
- * Gets and parses data from localStorage.
- * @param {string} key The key to retrieve.
- * @param {*} defaultValue The default value if key doesn't exist or parsing fails.
- * @returns {*} The parsed data or the default value.
- */
-function getStorageData(key, defaultValue) {
-    const raw = localStorage.getItem(key);
-    if (!raw) return defaultValue;
-    try {
-        return JSON.parse(raw);
-    } catch (e) {
-        console.error(`Failed to parse localStorage key "${key}":`, e);
-        return defaultValue;
-    }
-}
-
-/**
- * Saves data to localStorage as a JSON string.
- * @param {string} key The key to save under.
- * @param {*} value The data to save.
- */
-function setStorageData(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-        console.error(`Failed to set localStorage key "${key}":`, e);
-    }
-}
-
-// --- DOM UTILITY ---
-const $ = (id) => document.getElementById(id);
-
-// --- DEFAULT GAME DATA ---
-const defaultGames = {
-    'g_subway_surfers': {
-        title: 'Subway Surfers',
-        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/subway-surfers.html',
-        image: 'https://placehold.co/400x300/f87171/ffffff?text=Subway+Surfers',
-        description: 'Run and dodge trains in this endless runner classic!',
-        section: 'featured',
-        tags: ['runner', 'mobile', 'action'],
-        created: '2024-10-20T10:00:00.000Z'
+// --- STATE MANAGER ---
+const State = {
+    data: {
+        games: {},
+        settings: {},
+        stats: { counts: {}, recent: [], ratings: { like: {}, dislike: {} }, reports: {}, requests: [] },
+        user: { nickname: 'Player', avatar: '🎮' },
+        favorites: [],
+        notes: {},
+        ratings: {},
+        recent: [],
     },
-    'g_slope': {
-        title: 'Slope',
-        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/slope.html',
-        image: 'https://placehold.co/400x300/4f46e5/ffffff?text=Slope',
-        description: 'Guide a ball down a steep slope, avoid obstacles, and set a high score.',
-        section: 'recommended',
-        tags: ['3d', 'skill', 'endless'],
-        created: '2024-10-25T10:00:00.000Z'
-    },
-    'g_tunnel_rush': {
-        title: 'Tunnel Rush',
-        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/tunnel-rush.html',
-        image: 'https://placehold.co/400x300/10b981/ffffff?text=Tunnel+Rush',
-        description: 'Race through a psychedelic tunnel, dodging geometric obstacles.',
-        section: 'recommended',
-        tags: ['3d', 'skill', 'fast-paced'],
-        created: '2024-11-01T10:00:00.000Z'
-    },
-    // Game added from user's snippet
-    'g_penalty_kicks': {
-        title: 'Penalty Kicks (Flash)',
-        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/penalty-kicks.swf',
-        image: 'https://placehold.co/400x300/1e40af/ffffff?text=Penalty+Kicks',
-        description: 'Test your nerve and accuracy in this classic soccer penalty shootout game. Requires Ruffle (Flash player emulator).',
-        section: 'sports',
-        tags: ['sports', 'soccer', 'flash'],
-        created: '2024-11-18T10:00:00.000Z'
-    },
-};
-
-// --- CONSTANTS ---
-const AVATARS = ['🎮', '👾', '🚀', '🤖', '🐱', '🐶', '🍕', '⚽', '👑', '🧙'];
-const ACCENT_COLORS = {
-    'Blue': { hex: '#3b82f6', rgb: '59, 130, 246' }, // blue-500
-    'Green': { hex: '#10b981', rgb: '16, 185, 129' }, // emerald-500
-    'Purple': { hex: '#8b5cf6', rgb: '139, 92, 246' }, // violet-500
-    'Red': { hex: '#ef4444', rgb: '239, 68, 68' }, // red-500
-};
-
-// --- INIT AND SETUP ---
-
-/**
- * Initializes the application state by loading from localStorage.
- */
-function initialize() {
-    // Load all state variables from localStorage, providing defaults
-    allGames = getStorageData('hubGames', defaultGames);
-    settings = getStorageData('hubSettings', { 
-        theme: 'light', 
-        accent: 'Blue', 
-        cloakTitle: 'Google Docs', 
-        cloakFavicon: '📄' 
-    });
-    stats = getStorageData('hubStats', stats);
-    hubUser = getStorageData('hubUser', hubUser);
-    myFavorites = getStorageData('myFavorites', myFavorites);
-    myGameNotes = getStorageData('myGameNotes', myGameNotes);
-    myGameRatings = getStorageData('myGameRatings', myGameRatings);
     
-    // Initialize stats collections if they don't exist (safety)
-    stats.counts = stats.counts || {};
-    stats.recent = stats.recent || [];
-    stats.ratings = stats.ratings || { like: {}, dislike: {} };
+    load() {
+        this.data.games = Utils.getStorageData('hubGames', {});
+        this.data.settings = Utils.getStorageData('hubSettings', {
+            theme: 'light', 
+            accent: 'Blue', 
+            cloakTitle: 'Google Docs', 
+            cloakFavicon: '📄',
+            panicKey: 'q',
+        });
+        this.data.stats = Utils.getStorageData('hubStats', this.data.stats);
+        this.data.user = Utils.getStorageData('hubUser', this.data.user);
+        this.data.favorites = Utils.getStorageData('myFavorites', []);
+        this.data.notes = Utils.getStorageData('myGameNotes', {});
+        this.data.ratings = Utils.getStorageData('myGameRatings', {});
+        this.data.recent = Utils.getStorageData('localRecent', []);
+    },
+    
+    save() {
+        Utils.setStorageData('hubGames', this.data.games);
+        Utils.setStorageData('hubSettings', this.data.settings);
+        Utils.setStorageData('hubStats', this.data.stats);
+        Utils.setStorageData('hubUser', this.data.user);
+        Utils.setStorageData('myFavorites', this.data.favorites);
+        Utils.setStorageData('myGameNotes', this.data.notes);
+        Utils.setStorageData('myGameRatings', this.data.ratings);
+        Utils.setStorageData('localRecent', this.data.recent);
+    },
+};
 
-    // Apply initial settings
-    currentTheme = settings.theme;
-    updateTheme(currentTheme, false); // Apply theme without saving
-    updateAccentColor(settings.accent, false); // Apply accent without saving
+// --- XSS-SAFE RENDERER ---
+const Renderer = {
+    // Render game card with safe DOM methods
+    gameCard(gameId) {
+        const game = State.data.games[gameId];
+        if (!game) return document.createElement('div');
+        
+        const isFav = State.data.favorites.includes(gameId);
+        const dateAdded = new Date(game.created);
+        const isNew = (new Date() - dateAdded) / (1000 * 60 * 60 * 24) < CONFIG.NEW_GAME_DAYS;
+        
+        const userRating = State.data.ratings[gameId];
+        const likeCount = Object.keys(State.data.stats.ratings.like || {}).filter(id => id === gameId).length;
+        const dislikeCount = Object.keys(State.data.stats.ratings.dislike || {}).filter(id => id === gameId).length;
+        
+        const card = Utils.createElement('div', {
+            className: 'game-card group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-700',
+            'data-game-id': gameId,
+        });
+        
+        // Image container
+        const imgContainer = Utils.createElement('div', { className: 'relative w-full h-48 overflow-hidden' });
+        const img = Utils.createElement('img', {
+            src: game.image,
+            alt: game.title,
+            className: 'w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-80',
+            loading: 'lazy', // Performance
+        });
+        img.onerror = () => img.src = 'https://placehold.co/400x300/4f46e5/ffffff?text=Image+Missing';
+        imgContainer.appendChild(img);
+        
+        if (isNew) {
+            const newBadge = Utils.createElement('span', {
+                className: 'absolute top-2 left-2 bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md z-10',
+                textContent: 'NEW',
+            });
+            imgContainer.appendChild(newBadge);
+        }
+        
+        // Favorite button
+        const favBtn = Utils.createElement('button', {
+            className: 'absolute top-2 right-2 p-1.5 rounded-full bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm shadow-md hover:bg-white dark:hover:bg-gray-900 transition-colors z-20',
+            title: isFav ? 'Remove from Favorites' : 'Add to Favorites',
+        });
+        const favIcon = Utils.createElement('i', {
+            'data-lucide': 'heart',
+            className: `w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-300'}`,
+        });
+        favBtn.appendChild(favIcon);
+        favBtn.onclick = (e) => {
+            e.stopPropagation();
+            Actions.toggleFavorite(gameId);
+        };
+        imgContainer.appendChild(favBtn);
+        
+        // Content
+        const content = Utils.createElement('div', { className: 'p-4' });
+        const title = Utils.createElement('h3', {
+            className: 'text-lg font-semibold text-gray-900 dark:text-white truncate',
+            textContent: game.title,
+        });
+        title.title = game.title;
+        
+        const desc = Utils.createElement('p', {
+            className: 'text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2',
+            textContent: game.description,
+        });
+        
+        // Stats row
+        const statsRow = Utils.createElement('div', {
+            className: 'flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-700',
+        });
+        
+        // Play count
+        const playCount = Utils.createElement('div', {
+            className: 'flex items-center text-sm text-gray-500 dark:text-gray-400',
+        });
+        playCount.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${State.data.stats.counts[gameId] || 0}</span>`;
+        
+        // Rating buttons
+        const ratingBtns = Utils.createElement('div', {
+            className: 'flex items-center space-x-3',
+        });
+        
+        const likeBtn = this.ratingButton('like', likeCount, userRating === 'like', gameId);
+        const dislikeBtn = this.ratingButton('dislike', dislikeCount, userRating === 'dislike', gameId);
+        
+        ratingBtns.appendChild(likeBtn);
+        ratingBtns.appendChild(dislikeBtn);
+        
+        statsRow.appendChild(playCount);
+        statsRow.appendChild(ratingBtns);
+        
+        content.appendChild(title);
+        content.appendChild(desc);
+        content.appendChild(statsRow);
+        
+        card.appendChild(imgContainer);
+        card.appendChild(content);
+        
+        // Click handler for opening modal
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) {
+                Actions.openGameModal(gameId);
+            }
+        });
+        
+        return card;
+    },
+    
+    ratingButton(type, count, isActive, gameId) {
+        const btn = Utils.createElement('button', {
+            className: `flex items-center text-sm ${isActive ? (type === 'like' ? 'text-accent fill-accent' : 'text-red-500 fill-red-500') : 'text-gray-400 dark:text-gray-500 hover:text-accent'}`,
+        });
+        btn.innerHTML = `<i data-lucide="thumbs-${type}" class="w-4 h-4 mr-0.5"></i><span class="text-gray-600 dark:text-gray-300">${count}</span>`;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            Actions.toggleGameRating(gameId, type);
+        };
+        return btn;
+    },
+    
+    // Render tag filters with proper active state
+    tagFilters() {
+        const container = $('tagFilters');
+        if (!container) return;
+        
+        const allTags = new Set();
+        Object.values(State.data.games).forEach(game => {
+            (game.tags || []).forEach(tag => allTags.add(tag));
+        });
+        
+        // Update currentTags array of objects
+        window.currentTags = Array.from(allTags).sort().map(tag => ({
+            name: tag,
+            active: window.currentTags?.find(t => t.name === tag)?.active || false
+        }));
+        
+        container.innerHTML = '';
+        
+        // All button
+        const isAllActive = !window.currentTags.some(t => t.active);
+        const allBtn = Utils.createElement('button', {
+            className: `tag-button ${isAllActive ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`,
+            textContent: 'All',
+        });
+        allBtn.onclick = () => {
+            window.currentTags.forEach(t => t.active = false);
+            this.renderAll();
+        };
+        container.appendChild(allBtn);
+        
+        // Tag buttons
+        window.currentTags.forEach(tag => {
+            const btn = Utils.createElement('button', {
+                className: `tag-button ${tag.active ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`,
+                textContent: tag.name,
+            });
+            btn.onclick = () => {
+                tag.active = !tag.active;
+                this.renderAll();
+            };
+            container.appendChild(btn);
+        });
+    },
+    
+    // Render all sections
+    pageContent() {
+        const container = $('gameContent');
+        if (!container) return;
+        
+        // Add Recently Played section first if enabled
+        if (CONFIG.FEATURES.RECENTLY_PLAYED && State.data.recent.length > 0) {
+            const recentSection = Utils.createElement('section', { className: 'game-section mb-12' });
+            const title = Utils.createElement('h2', {
+                className: 'text-2xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2',
+                textContent: 'Continue Playing',
+            });
+            const grid = Utils.createElement('div', { className: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' });
+            
+            State.data.recent.slice(0, CONFIG.LOCAL_RECENT_LIMIT).forEach(id => {
+                if (State.data.games[id]) {
+                    grid.appendChild(this.gameCard(id));
+                }
+            });
+            
+            recentSection.appendChild(title);
+            recentSection.appendChild(grid);
+            container.appendChild(recentSection);
+        }
+        
+        // Process and render games by section
+        const gamesArray = Object.keys(State.data.games).map(id => ({ ...State.data.games[id], id }));
+        const processed = this.processGames(gamesArray);
+        
+        const sections = processed.reduce((acc, game) => {
+            const sectionName = game.section || 'other';
+            acc[sectionName] = acc[sectionName] || [];
+            acc[sectionName].push(game);
+            return acc;
+        }, {});
+        
+        const sectionOrder = ['featured', 'recommended', 'sports', 'other'];
+        
+        sectionOrder.forEach(sectionKey => {
+            const sectionGames = sections[sectionKey];
+            if (sectionGames && sectionGames.length > 0) {
+                const sectionEl = Utils.createElement('section', {
+                    className: 'game-section mb-12',
+                    id: `section-${sectionKey}`,
+                });
+                const title = Utils.createElement('h2', {
+                    className: 'text-2xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2',
+                    textContent: sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1),
+                });
+                const grid = Utils.createElement('div', { className: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' });
+                
+                sectionGames.forEach(game => grid.appendChild(this.gameCard(game.id)));
+                
+                sectionEl.appendChild(title);
+                sectionEl.appendChild(grid);
+                container.appendChild(sectionEl);
+            }
+        });
+        
+        // No results
+        if (processed.length === 0 && window.currentSearchQuery) {
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <i data-lucide="frown" class="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600"></i>
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300">No Games Found</h3>
+                    <p class="mt-2 text-gray-500 dark:text-gray-500">Try a different search query or clear your filters.</p>
+                </div>
+            `;
+        }
+        
+        lucide.createIcons();
+    },
+    
+    // Process games with filters and sorting
+    processGames(games) {
+        let processed = [...games];
+        
+        // Filter by active tags
+        const activeTags = window.currentTags.filter(t => t.active).map(t => t.name);
+        if (activeTags.length > 0) {
+            processed = processed.filter(game => 
+                activeTags.every(tag => (game.tags || []).includes(tag))
+            );
+        }
+        
+        // Search filter
+        if (window.currentSearchQuery) {
+            const query = window.currentSearchQuery.toLowerCase();
+            processed = processed.filter(game => 
+                game.title.toLowerCase().includes(query) || 
+                (game.description || '').toLowerCase().includes(query) ||
+                (game.tags || []).some(tag => tag.toLowerCase().includes(query))
+            );
+        }
+        
+        // Sort
+        const sort = window.currentGameSort || 'name';
+        switch (sort) {
+            case 'newest':
+                processed.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+                break;
+            case 'mostPlayed':
+                processed.sort((a, b) => (State.data.stats.counts[b.id] || 0) - (State.data.stats.counts[a.id] || 0));
+                break;
+            default:
+                processed.sort((a, b) => a.title.localeCompare(b.title));
+        }
+        
+        return processed;
+    },
+    
+    renderAll() {
+        this.tagFilters();
+        this.pageContent();
+        lucide.createIcons();
+    },
+};
 
-    // Set up tags from all games
+// --- ACTIONS ---
+const Actions = {
+    // Open game modal with enhanced features
+    openGameModal(gameId) {
+        if (!Utils.checkRateLimit('playGame')) {
+            customAlert('Slow down! Too many actions.', "Rate Limited", "error");
+            return;
+        }
+        
+        const game = State.data.games[gameId];
+        if (!game) return;
+        
+        window.currentModalGameId = gameId;
+        
+        const modal = $('gameModal');
+        const iframe = $('modalGameIframe');
+        
+        // Populate content
+        $('modalTitle').textContent = game.title;
+        $('modalDescription').textContent = game.description;
+        
+        // Tags
+        const tagsEl = $('modalTags');
+        tagsEl.innerHTML = '';
+        (game.tags || []).forEach(tag => {
+            const tagSpan = Utils.createElement('span', {
+                className: 'text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+                textContent: tag,
+            });
+            tagsEl.appendChild(tagSpan);
+        });
+        
+        // Load game with error handling
+        iframe.style.background = 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2I4MmY2IiBzdHJva2Utd2lkdGg9IjMiLz48L3N2Zz4=) center no-repeat';
+        
+        if (game.url.endsWith('.swf')) {
+            const ruffleWrapper = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1f2937; overflow: hidden; }
+                        #ruffle-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+                        .error { color: white; font-family: Arial; padding: 20px; }
+                    </style>
+                    <script src="https://unpkg.com/@ruffle-rs/ruffle@latest"><\/script>
+                </head>
+                <body>
+                    <div id="ruffle-container">
+                        <div class="error">Loading Flash game...</div>
+                    </div>
+                    <script>
+                        window.RufflePlayer = window.RufflePlayer || {};
+                        window.addEventListener("load", () => {
+                            try {
+                                const ruffle = window.RufflePlayer.newest();
+                                const player = ruffle.createPlayer();
+                                player.style.width = '100%';
+                                player.style.height = '100%';
+                                player.load("${game.url}");
+                                document.getElementById('ruffle-container').innerHTML = '';
+                                document.getElementById('ruffle-container').appendChild(player);
+                            } catch (e) {
+                                document.getElementById('ruffle-container').innerHTML = 
+                                    '<div class="error">Failed to load Flash content. Game may be incompatible.</div>';
+                                console.error("Ruffle error:", e);
+                            }
+                        });
+                    <\/script>
+                </body>
+                </html>
+            `;
+            iframe.srcdoc = ruffleWrapper;
+        } else {
+            iframe.src = game.url;
+        }
+        
+        iframe.onload = () => iframe.style.background = '';
+        iframe.onerror = () => {
+            iframe.srcdoc = `<div style="padding:40px;text-align:center;font-family:Arial;">
+                <h2 style="color:white;">Game Failed to Load</h2>
+                <button onclick="Actions.reportGame('${gameId}', 'broken')" 
+                        style="margin-top:20px;padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:5px;cursor:pointer;">
+                    Report Broken Game
+                </button>
+            </div>`;
+        };
+        
+        // Load note
+        const noteTextarea = $('modalNoteText');
+        noteTextarea.value = State.data.notes[gameId] || '';
+        $('modalNoteArea').classList.toggle('hidden', !State.data.notes[gameId]);
+        
+        // Update stats
+        this.updateGameStats(gameId);
+        this.updateModalStatsUI(gameId);
+        
+        // Show modal
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.querySelector('.transform').classList.remove('scale-95');
+        
+        // Request fullscreen option
+        if (CONFIG.FEATURES.FULLSCREEN) {
+            const fullscreenBtn = Utils.createElement('button', {
+                className: 'p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-accent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors',
+                title: 'Fullscreen',
+                innerHTML: '<i data-lucide="maximize" class="w-5 h-5"></i>',
+            });
+            fullscreenBtn.onclick = () => iframe.requestFullscreen();
+            $('modalTitle').parentNode.appendChild(fullscreenBtn);
+        }
+    },
+    
+    // Report broken game
+    reportGame(gameId, reason = 'broken') {
+        State.data.stats.reports[gameId] = {
+            reason,
+            user: State.data.user.nickname,
+            timestamp: Date.now(),
+            url: State.data.games[gameId]?.url,
+        };
+        State.save();
+        customAlert('Game reported. Admin will review.', "Reported", "info");
+    },
+    
+    // Update stats with rate limiting
+    updateGameStats(gameId) {
+        State.data.stats.counts[gameId] = (State.data.stats.counts[gameId] || 0) + 1;
+        
+        // Update recent lists
+        State.data.recent = State.data.recent.filter(id => id !== gameId);
+        State.data.recent.unshift(gameId);
+        State.data.recent = State.data.recent.slice(0, CONFIG.LOCAL_RECENT_LIMIT);
+        
+        State.data.stats.recent = State.data.stats.recent.filter(id => id !== gameId);
+        State.data.stats.recent.unshift(gameId);
+        State.data.stats.recent = State.data.stats.recent.slice(0, CONFIG.GLOBAL_RECENT_LIMIT);
+        
+        State.save();
+        this.updateModalStatsUI(gameId);
+    },
+    
+    // Toggle favorite with undo
+    toggleFavorite(gameId) {
+        const game = State.data.games[gameId];
+        if (!game) return;
+        
+        const index = State.data.favorites.indexOf(gameId);
+        if (index > -1) {
+            State.data.favorites.splice(index, 1);
+            customAlert(`Removed ${game.title} from favorites.`, "Removed", "info");
+        } else {
+            State.data.favorites.push(gameId);
+            customAlert(`Added ${game.title} to favorites!`, "Favorited", "success");
+        }
+        State.save();
+        Renderer.renderAll();
+        if (window.currentModalGameId === gameId) this.updateModalStatsUI(gameId);
+    },
+    
+    // Toggle rating with rate limiting
+    toggleGameRating(gameId, type) {
+        if (!Utils.checkRateLimit('rateGame')) {
+            customAlert('Too many ratings. Please slow down.', "Rate Limited", "error");
+            return;
+        }
+        
+        const game = State.data.games[gameId];
+        if (!game) return;
+        
+        const currentRating = State.data.ratings[gameId];
+        const newRating = currentRating === type ? null : type;
+        
+        // Remove old rating
+        if (currentRating) {
+            delete State.data.stats.ratings[currentRating][gameId];
+        }
+        
+        // Add new rating
+        if (newRating) {
+            State.data.ratings[gameId] = newRating;
+            State.data.stats.ratings[newRating][gameId] = true;
+            customAlert(`Rated ${game.title} as ${newRating}!`, "Rated", "success");
+        } else {
+            delete State.data.ratings[gameId];
+            customAlert('Rating removed.', "Removed", "info");
+        }
+        
+        State.save();
+        Renderer.renderAll();
+        if (window.currentModalGameId === gameId) this.updateModalStatsUI(gameId);
+    },
+    
+    // Update modal UI elements
+    updateModalStatsUI(gameId) {
+        const el = {
+            statsCount: $('modalStatsCount'),
+            favBtn: $('modalFavoriteBtn'),
+            likeBtn: $('modalLikeBtn'),
+            dislikeBtn: $('modalDislikeBtn'),
+            noteBtn: $('modalNoteBtn'),
+            noteArea: $('modalNoteArea'),
+        };
+        
+        if (Object.values(el).some(e => !e)) {
+            console.warn("Modal elements not ready");
+            return;
+        }
+        
+        const game = State.data.games[gameId];
+        const isFav = State.data.favorites.includes(gameId);
+        const userRating = State.data.ratings[gameId];
+        const likeCount = Object.keys(State.data.stats.ratings.like || {}).filter(id => id === gameId).length;
+        const dislikeCount = Object.keys(State.data.stats.ratings.dislike || {}).filter(id => id === gameId).length;
+        const hasNote = !!State.data.notes[gameId];
+        
+        el.statsCount.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${Utils.formatNumber(State.data.stats.counts[gameId] || 0)}</span>`;
+        
+        el.favBtn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
+        el.favBtn.title = isFav ? 'Remove from Favorites' : 'Add to Favorites';
+        
+        el.likeBtn.innerHTML = `<i data-lucide="thumbs-up" class="w-5 h-5 ${userRating === 'like' ? 'fill-accent text-accent' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${likeCount}</span>`;
+        el.likeBtn.title = userRating === 'like' ? 'Remove Like' : 'Like Game';
+        
+        el.dislikeBtn.innerHTML = `<i data-lucide="thumbs-down" class="w-5 h-5 ${userRating === 'dislike' ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${dislikeCount}</span>`;
+        el.dislikeBtn.title = userRating === 'dislike' ? 'Remove Dislike' : 'Dislike Game';
+        
+        el.noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 ${hasNote ? 'fill-yellow-400 text-yellow-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
+        el.noteBtn.title = hasNote ? 'Edit Note (Saved)' : 'Add Note';
+        
+        lucide.createIcons();
+    },
+    
+    // Save note
+    saveNote(gameId) {
+        const note = $('modalNoteText').value.trim();
+        if (note) {
+            State.data.notes[gameId] = note;
+            customAlert('Note saved!', "Saved", "success");
+        } else {
+            delete State.data.notes[gameId];
+            customAlert('Note cleared.', "Cleared", "info");
+        }
+        State.save();
+        this.updateModalStatsUI(gameId);
+    },
+    
+    // Random game
+    playRandomGame() {
+        const ids = Object.keys(State.data.games);
+        if (ids.length === 0) return;
+        const randomId = ids[Math.floor(Math.random() * ids.length)];
+        this.openGameModal(randomId);
+    },
+    
+    // Export data
+    exportData() {
+        const data = {
+            games: State.data.games,
+            settings: State.data.settings,
+            stats: State.data.stats,
+            user: State.data.user,
+            favorites: State.data.favorites,
+            notes: State.data.notes,
+            ratings: State.data.ratings,
+            exportDate: new Date().toISOString(),
+            version: CONFIG.VERSION,
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = Utils.createElement('a', {
+            href: url,
+            download: `GameHub_Export_${new Date().toISOString().slice(0, 10)}.json`,
+        });
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        customAlert('Data exported successfully!', "Export Complete", "success");
+    },
+    
+    // Import data with confirmation
+    importData(file) {
+        if (!confirm('⚠️ This will OVERWRITE all existing data. Continue?')) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (!confirm(`Import ${Object.keys(imported.games || {}).length} games and overwrite all settings?`)) return;
+                
+                State.data = { ...State.data, ...imported };
+                State.save();
+                initialize();
+                customAlert('Data imported successfully! Hub reloaded.', "Import Complete", "success");
+            } catch (error) {
+                console.error("Import error:", error);
+                customAlert(`Import failed: ${error.message}`, "Error", "error");
+            }
+        };
+        reader.readAsText(file);
+        $('importFileInput').value = '';
+    },
+    
+    // Admin: Add/edit game with validation
+    saveGame(formData) {
+        if (!Utils.checkRateLimit('saveGame', 5)) {
+            customAlert('Too many saves. Slow down.', "Rate Limited", "error");
+            return;
+        }
+        
+        const id = formData.get('id');
+        const title = formData.get('title').trim();
+        const url = formData.get('url').trim();
+        const image = formData.get('image').trim();
+        const description = formData.get('description').trim();
+        const tags = formData.get('tags').split(',').map(t => t.trim().toLowerCase()).filter(t => t);
+        const section = formData.get('section') || 'other';
+        const controls = formData.get('controls')?.trim();
+        
+        // Validation
+        if (!title || !url) {
+            customAlert('Title and URL are required.', "Validation Error", "error");
+            return;
+        }
+        if (!Utils.isValidUrl(url)) {
+            customAlert('Invalid game URL. Must be http:// or https://', "Validation Error", "error");
+            return;
+        }
+        if (image && !Utils.isValidUrl(image)) {
+            customAlert('Invalid image URL.', "Validation Error", "error");
+            return;
+        }
+        
+        const gameData = {
+            title,
+            url,
+            image: image || `https://placehold.co/400x300/4f46e5/ffffff?text=${encodeURIComponent(title)}`,
+            description: description || 'No description provided.',
+            tags,
+            section,
+            controls,
+            created: id ? State.data.games[id]?.created : new Date().toISOString(),
+        };
+        
+        const gameId = id || `g_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        State.data.games[gameId] = { ...State.data.games[gameId], ...gameData };
+        State.save();
+        
+        customAlert(`Game "${title}" ${id ? 'updated' : 'added'}!`, "Success", "success");
+        clearAddForm();
+        initialize();
+    },
+};
+
+// --- EVENT LISTENERS ---
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        // Initialize state
+        State.load();
+        
+        // DOM cache
+        const DOM = {
+            search: $('searchInput'),
+            sort: $('sortSelect'),
+            panic: $('panicBtn'),
+            container: $('appContainer'),
+            modal: $('gameModal'),
+            iframe: $('modalGameIframe'),
+            noteText: $('modalNoteText'),
+            noteArea: $('modalNoteArea'),
+            profileBtn: $('profileBtn'),
+            settingsBtn: $('settingsBtn'),
+        };
+        
+        // Debounced search
+        DOM.search.oninput = Utils.debounce((e) => {
+            window.currentSearchQuery = e.target.value;
+            Renderer.renderAll();
+        }, CONFIG.SEARCH_DEBOUNCE_MS);
+        
+        DOM.sort.onchange = (e) => {
+            window.currentGameSort = e.target.value;
+            Renderer.renderAll();
+        };
+        
+        // Panic button with custom key
+        DOM.panic.onclick = () => Actions.toggleCloak();
+        document.addEventListener('keydown', (e) => {
+            if (e.key === State.data.settings.panicKey && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                e.preventDefault();
+                Actions.toggleCloak();
+            }
+        });
+        
+        // Modal event listeners
+        $('closeModalBtn').onclick = () => Actions.closeGameModal();
+        $('modalNoteBtn').onclick = () => DOM.noteArea.classList.toggle('hidden');
+        $('modalNoteSaveBtn').onclick = () => Actions.saveNote(window.currentModalGameId);
+        
+        // Rating buttons
+        $('modalLikeBtn').onclick = () => Actions.toggleGameRating(window.currentModalGameId, 'like');
+        $('modalDislikeBtn').onclick = () => Actions.toggleGameRating(window.currentModalGameId, 'dislike');
+        $('modalFavoriteBtn').onclick = () => Actions.toggleFavorite(window.currentModalGameId);
+        
+        // Random game button
+        if (CONFIG.FEATURES.RANDOM_GAME) {
+            const randomBtn = Utils.createElement('button', {
+                className: 'p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors',
+                title: 'Random Game',
+                innerHTML: '<i data-lucide="dice" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>',
+            });
+            randomBtn.onclick = () => Actions.playRandomGame();
+            $('searchInput').parentNode.appendChild(randomBtn);
+        }
+        
+        // Escape key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (window.currentModalGameId) Actions.closeGameModal();
+                if ($('profileModal').classList.contains('pointer-events-none') === false) closeProfileModal();
+                if ($('settingsModal').classList.contains('pointer-events-none') === false) closeSettingsModal();
+            }
+        });
+        
+        // Initialize UI
+        initialize();
+        
+        // Hide loading screen
+        setTimeout(() => {
+            $('loadingModal').classList.add('opacity-0');
+            setTimeout(() => $('loadingModal').classList.add('hidden'), 300);
+        }, 500);
+        
+        console.log(`${CONFIG.APP_NAME} v${CONFIG.VERSION} initialized successfully.`);
+        
+    } catch (err) {
+        console.error("Fatal initialization error:", err);
+        $('loadingModal').innerHTML = `
+            <div class="p-6 bg-red-800 border-4 border-red-500 rounded-lg text-white max-w-md">
+                <h2 class="text-2xl font-bold mb-2">💥 Critical Error</h2>
+                <p class="mb-4">Failed to load the application. Check console (F12) for details.</p>
+                <button onclick="location.reload()" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700">Reload</button>
+            </div>`;
+    }
+});
+
+// --- INITIALIZATION ---
+function initialize() {
+    // Apply theme
+    updateTheme(State.data.settings.theme, false);
+    updateAccentColor(State.data.settings.accent, false);
+    
+    // Update document title and favicon
+    document.title = CONFIG.APP_NAME;
+    $('appTitle').textContent = CONFIG.APP_NAME;
+    
+    // Setup tag filters
     const allTags = new Set();
-    Object.values(allGames).forEach(game => {
+    Object.values(State.data.games).forEach(game => {
         (game.tags || []).forEach(tag => allTags.add(tag));
     });
-    currentTags = Array.from(allTags).sort();
-
-    // Load recent games locally for accurate count
-    localRecent = getStorageData('localRecent', []);
-
-    // Set initial search/sort state
-    currentSearchQuery = '';
-    currentGameSort = 'name';
-
-    // Initial render
-    renderAll();
+    window.currentTags = Array.from(allTags).sort().map(tag => ({ name: tag, active: false }));
+    
+    // Render everything
+    Renderer.renderAll();
+    renderNavigation();
+    
+    // Setup PWA if enabled
+    if (CONFIG.FEATURES.PWA_SUPPORT && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(() => {
+            console.log('PWA Service Worker registered');
+        }).catch(err => console.log('PWA not available:', err));
+    }
+    
+    // Check for updates (weekly)
+    checkForUpdates();
 }
 
-/**
- * Updates the theme globally and saves the setting.
- * @param {'light'|'dark'} theme 
- * @param {boolean} save Whether to save to settings (default true)
- */
+function renderNavigation() {
+    const profileBtn = $('profileBtn');
+    if (profileBtn) {
+        profileBtn.innerHTML = `<span class="text-xl">${State.data.user.avatar}</span>`;
+        profileBtn.title = `${State.data.user.nickname}'s Profile`;
+    }
+}
+
 function updateTheme(theme, save = true) {
-    currentTheme = theme;
+    State.data.settings.theme = theme;
     if (theme === 'dark') {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
     }
-
-    if (save) {
-        settings.theme = theme;
-        setStorageData('hubSettings', settings);
-    }
+    if (save) State.save();
 }
 
-/**
- * Updates the CSS variables for the accent color.
- * @param {string} colorName 
- * @param {boolean} save Whether to save to settings (default true)
- */
 function updateAccentColor(colorName, save = true) {
-    const color = ACCENT_COLORS[colorName];
+    const color = CONFIG.ACCENT_COLORS[colorName];
     if (!color) return;
-
+    
     document.documentElement.style.setProperty('--accent-color', color.hex);
     document.documentElement.style.setProperty('--accent-color-rgb', color.rgb);
-
+    
     if (save) {
-        settings.accent = colorName;
-        setStorageData('hubSettings', settings);
+        State.data.settings.accent = colorName;
+        State.save();
     }
 }
 
-// --- RENDERING FUNCTIONS ---
-
-/**
- * Renders the entire application content based on the current view.
- */
-function renderAll() {
-    renderNavigation();
-    renderTagFilters();
-    renderPageContent();
-    lucide.createIcons();
-}
-
-/**
- * Renders the nickname and avatar in the header.
- */
-function renderNavigation() {
-    const profileBtn = $('profileBtn');
-    if (profileBtn) {
-        profileBtn.innerHTML = `<span class="text-xl">${hubUser.avatar}</span>`;
-    }
-}
-
-/**
- * Renders the filterable tags above the game list.
- */
-function renderTagFilters() {
-    const tagFiltersEl = $('tagFilters');
-    if (!tagFiltersEl) return;
-    
-    // The "All" button
-    const isAllActive = currentTags.length === 0 || currentTags.every(tag => tag.active === false);
-    let html = `<button onclick="clearTagFilters()" class="tag-button ${isAllActive ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}">All</button>`;
-    
-    // Other tag buttons
-    html += currentTags.map(tag => {
-        const isActive = tag.active;
-        return `<button onclick="toggleTagFilter('${tag.name}')" class="tag-button ${isActive ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}">
-            ${tag.name}
-        </button>`;
-    }).join('');
-    
-    tagFiltersEl.innerHTML = html;
-}
-
-
-/**
- * Renders all game sections and cards.
- */
-function renderPageContent() {
-    const gameContentEl = $('gameContent');
-    if (!gameContentEl) return;
-    
-    const gamesArray = Object.keys(allGames).map(id => ({ ...allGames[id], id }));
-    const processedGames = processGames(gamesArray);
-    
-    // Group games by section
-    const sections = processedGames.reduce((acc, game) => {
-        const sectionName = game.section || 'other';
-        acc[sectionName] = acc[sectionName] || [];
-        acc[sectionName].push(game);
-        return acc;
-    }, {});
-
-    let html = '';
-    const sectionOrder = ['featured', 'recommended', 'sports', 'other'];
-
-    sectionOrder.forEach(sectionKey => {
-        const sectionGames = sections[sectionKey];
-        if (sectionGames && sectionGames.length > 0) {
-            const sectionTitle = sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1);
-            html += `
-                <section class="game-section" id="section-${sectionKey}">
-                    <h2 class="text-2xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">${sectionTitle}</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        ${sectionGames.map(game => renderGameCard(game.id)).join('')}
-                    </div>
-                </section>
-            `;
-        }
-    });
-
-    // Handle No Results
-    if (processedGames.length === 0 && currentSearchQuery) {
-        html = `
-            <div class="text-center py-12">
-                <i data-lucide="frown" class="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600"></i>
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300">No Games Found</h3>
-                <p class="mt-2 text-gray-500 dark:text-gray-500">Try a different search query or clear your filters.</p>
-            </div>
-        `;
-    }
-
-    gameContentEl.innerHTML = html;
-}
-
-/**
- * Renders a single game card HTML string.
- * @param {string} gameId The ID of the game to render.
- * @returns {string} The HTML string for the game card.
- */
-function renderGameCard(gameId) {
-    const game = allGames[gameId];
-    if (!game) return '';
-
-    const isFav = myFavorites.includes(gameId);
-    const dateAdded = new Date(game.created);
-    const isNew = (new Date() - dateAdded) / (1000 * 60 * 60 * 24) < NEW_GAME_DAYS;
-
-    // Rating information
-    const userRating = myGameRatings[gameId];
-    // Calculate total likes/dislikes for this specific game (approximate for card view)
-    const likeCount = Object.keys(stats.ratings.like || {}).filter(id => id === gameId).length;
-    const dislikeCount = Object.keys(stats.ratings.dislike || {}).filter(id => id === gameId).length;
-    
-    const likeActive = userRating === 'like' ? 'text-accent fill-accent' : 'text-gray-400 dark:text-gray-500 hover:text-accent';
-    const dislikeActive = userRating === 'dislike' ? 'text-red-500 fill-red-500' : 'text-gray-400 dark:text-gray-500 hover:text-red-500';
-
-    // The entire card is clickable to open the modal
-    return `
-        <div id="game-card-${gameId}" data-game-id="${gameId}" class="game-card group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-700">
-            <div class="relative w-full h-48 overflow-hidden">
-                <img src="${game.image}" alt="${game.title}" class="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-80" onerror="this.onerror=null;this.src='https://placehold.co/400x300/4f46e5/ffffff?text=Image+Missing';">
-                ${isNew ? '<span class="absolute top-2 left-2 bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md z-10">NEW</span>' : ''}
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300"></div>
-                
-                <!-- Favorite Button Overlay -->
-                <button onclick="toggleFavorite('${gameId}'); event.stopPropagation();" class="absolute top-2 right-2 p-1.5 rounded-full bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm shadow-md hover:bg-white dark:hover:bg-gray-900 transition-colors z-20">
-                    <i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-300'}"></i>
-                </button>
-            </div>
-            
-            <div class="p-4">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate" title="${game.title}">${game.title}</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">${game.description}</p>
-                
-                <!-- Rating and Play Count -->
-                <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <!-- Play Count -->
-                    <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <i data-lucide="play" class="w-4 h-4 mr-1"></i>
-                        <span>${stats.counts[gameId] || 0} Plays</span>
-                    </div>
-
-                    <!-- Rating Buttons (for quick card interaction) -->
-                    <div class="flex items-center space-x-3">
-                        <span class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                            <i data-lucide="thumbs-up" class="w-4 h-4 mr-0.5 ${likeActive}"></i>
-                            <span class="text-gray-600 dark:text-gray-300">${likeCount}</span>
-                        </span>
-                        <span class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                            <i data-lucide="thumbs-down" class="w-4 h-4 mr-0.5 ${dislikeActive}"></i>
-                            <span class="text-gray-600 dark:text-gray-300">${dislikeCount}</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// --- STATS AND INTERACTION LOGIC ---
-
-/**
- * Increments the play count for a game and records it as recently played.
- * @param {string} gameId 
- */
-function updateGameStats(gameId) {
-    // 1. Update global play count
-    stats.counts[gameId] = (stats.counts[gameId] || 0) + 1;
-
-    // 2. Update global recent list (limit to 10)
-    stats.recent = stats.recent.filter(id => id !== gameId);
-    stats.recent.unshift(gameId);
-    stats.recent = stats.recent.slice(0, 10);
-
-    // 3. Update local recent list (for card rendering, limit to 5)
-    localRecent = localRecent.filter(id => id !== gameId);
-    localRecent.unshift(gameId);
-    localRecent = localRecent.slice(0, 5);
-    
-    // Save everything
-    setStorageData('hubStats', stats);
-    setStorageData('localRecent', localRecent);
-
-    // Update the UI if the modal is open
-    if (currentModalGameId === gameId) {
-        updateModalStatsUI(gameId);
-    }
-}
-
-/**
- * Toggles the user's favorite status for a game.
- * @param {string} gameId 
- */
-function toggleFavorite(gameId) {
-    if (!allGames[gameId]) return;
-    const index = myFavorites.indexOf(gameId);
-    if (index > -1) {
-        myFavorites.splice(index, 1);
-        customAlert(`Removed ${allGames[gameId].title} from favorites.`, "Removed", "info");
-    } else {
-        myFavorites.push(gameId);
-        customAlert(`Added ${allGames[gameId].title} to favorites!`, "Favorited", "success");
-    }
-    setStorageData('myFavorites', myFavorites);
-    renderAll(); // Re-render to update the heart icon on the card
-    if (currentModalGameId === gameId) {
-        updateModalStatsUI(gameId); // Update the heart icon in the modal
-    }
-}
-
-/**
- * Toggles the user's rating (like/dislike) for a specific game.
- * @param {string} gameId The ID of the game.
- * @param {'like'|'dislike'} type The rating type.
- */
-function toggleGameRating(gameId, type) {
-    if (!allGames[gameId]) return;
-
-    const currentRating = myGameRatings[gameId];
-    const gameTitle = allGames[gameId].title;
-
-    // Initialize stats structure if needed
-    stats.ratings.like = stats.ratings.like || {};
-    stats.ratings.dislike = stats.ratings.dislike || {};
-
-    const newRating = type;
-
-    if (currentRating === newRating) {
-        // Toggling off the same rating
-        delete myGameRatings[gameId];
-        delete stats.ratings[currentRating][gameId];
-        customAlert(`Rating removed for ${gameTitle}.`, "Removed", "info");
-    } else {
-        // Remove old rating if it exists
-        if (currentRating) {
-            delete stats.ratings[currentRating][gameId];
-        }
-        
-        myGameRatings[gameId] = newRating; // Set new user rating
-        stats.ratings[newRating][gameId] = true; // Add to new type
-        customAlert(`Rated ${gameTitle} as ${newRating}!`, "Rated", "success");
-    }
-
-    setStorageData('hubStats', stats);
-    setStorageData('myGameRatings', myGameRatings);
-    
-    // Re-render all to update the card, and update modal if open
-    renderAll(); 
-    if (currentModalGameId === gameId) {
-        updateModalStatsUI(gameId); 
-    }
-}
-
-
-// --- GAME MODAL LOGIC ---
-
-/**
- * **CRITICAL FIX LOCATION**
- * Updates the modal UI elements (stats, favorite status, rating status) for the current game.
- * @param {string} gameId 
- */
-function updateModalStatsUI(gameId) {
-    const game = allGames[gameId];
-    if (!game) return;
-
-    // Element references. Added null checks below to prevent the reported TypeError.
-    const statsCountEl = $('modalStatsCount');
-    const favBtn = $('modalFavoriteBtn');
-    const likeBtn = $('modalLikeBtn');
-    const dislikeBtn = $('modalDislikeBtn');
-    const noteBtn = $('modalNoteBtn');
-    const noteArea = $('modalNoteArea'); // Also adding a check for this element
-
-    // --- CRITICAL NULL CHECK TO PREVENT CRASHES ---
-    if (!statsCountEl || !favBtn || !likeBtn || !dislikeBtn || !noteBtn || !noteArea) {
-        console.error("Game Modal UI elements are missing. Cannot update stats UI. (This is the fix for the reported TypeError.)");
-        return; 
-    }
-    // ---------------------------------------------
-    
-    const isFav = myFavorites.includes(gameId);
-    const userRating = myGameRatings[gameId];
-    const likeCount = Object.keys(stats.ratings.like || {}).filter(id => id === gameId).length;
-    const dislikeCount = Object.keys(stats.ratings.dislike || {}).filter(id => id === gameId).length;
-    const hasNote = !!myGameNotes[gameId];
-    
-    // 1. Update Play Count
-    statsCountEl.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${stats.counts[gameId] || 0}</span>`;
-
-    // 2. Update Favorite Button
-    favBtn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
-    favBtn.title = isFav ? 'Remove from Favorites' : 'Add to Favorites';
-
-    // 3. Update Like Button
-    likeBtn.innerHTML = `<i data-lucide="thumbs-up" class="w-5 h-5 ${userRating === 'like' ? 'fill-accent text-accent' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${likeCount}</span>`;
-    likeBtn.title = userRating === 'like' ? 'Remove Like' : 'Like Game';
-
-    // 4. Update Dislike Button
-    dislikeBtn.innerHTML = `<i data-lucide="thumbs-down" class="w-5 h-5 ${userRating === 'dislike' ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${dislikeCount}</span>`;
-    dislikeBtn.title = userRating === 'dislike' ? 'Remove Dislike' : 'Dislike Game';
-
-    // 5. Update Note Button
-    if (hasNote) {
-        noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 fill-yellow-400 text-yellow-500"></i>`;
-        noteBtn.title = 'Edit Note (Saved)';
-    } else {
-        noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>`;
-        noteBtn.title = 'Add Note';
-        noteArea.classList.add('hidden'); // Hide note area by default if no note
-    }
-    
-    lucide.createIcons(); // Re-render icons after changing content
-}
-
-/**
- * Opens the game modal and loads the game.
- * @param {string} gameId 
- */
-function openGameModal(gameId) {
-    const game = allGames[gameId];
-    if (!game) return;
-
-    currentModalGameId = gameId;
-
-    const modal = $('gameModal');
-    const titleEl = $('modalTitle');
-    const tagsEl = $('modalTags');
-    const descEl = $('modalDescription');
-    const iframe = $('modalGameIframe');
-    const noteTextarea = $('modalNoteText');
-    const noteArea = $('modalNoteArea');
-    
-    // 1. Populate modal content
-    titleEl.textContent = game.title;
-    descEl.textContent = game.description;
-    
-    tagsEl.innerHTML = (game.tags || []).map(tag => 
-        `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">${tag}</span>`
-    ).join('');
-
-    // 2. Load game into iframe
-    const url = game.url;
-    
-    // For flash content, we load a wrapper HTML file that loads Ruffle.js
-    if (url.endsWith('.swf')) {
-        // This is a common pattern for loading SWF with Ruffle
-        const ruffleWrapper = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1f2937; overflow: hidden; }
-                    #ruffle-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-                </style>
-                <script src="https://cdn.jsdelivr.net/gh/u-cvlassrom-y/google@main/ruffle.js"></script>
-            </head>
-            <body>
-                <div id="ruffle-container">
-                    <object width="100%" height="100%">
-                        <param name="movie" value="${url}">
-                        <embed src="${url}" width="100%" height="100%">
-                    </object>
-                </div>
-                <script>
-                    window.RufflePlayer = window.RufflePlayer || {};
-                    window.RufflePlayer.config = {
-                        "autoplay": "on",
-                        "unmute-on-click": true,
-                        "base": "${url.substring(0, url.lastIndexOf('/') + 1)}",
-                        "allow-script-access": true,
-                        "quality": "high",
-                        "force-embedded-layout": true,
-                    };
-                    window.addEventListener("load", () => {
-                        const ruffle = window.RufflePlayer.newest();
-                        const player = ruffle.unmute().play();
-                        
-                        // Check if the game is embedded or an external SWF file
-                        const target = document.querySelector('embed') || document.querySelector('object');
-                        if(target) {
-                             const container = document.getElementById('ruffle-container');
-                             ruffle.load(target, {}).then((player) => {
-                                 player.style.width = '100%';
-                                 player.style.height = '100%';
-                                 container.innerHTML = '';
-                                 container.appendChild(player);
-                             });
-                        }
-                    });
-                </script>
-            </body>
-            </html>
-        `;
-        iframe.srcdoc = ruffleWrapper;
-    } else {
-        iframe.src = url;
-    }
-
-    // 3. Load note
-    noteTextarea.value = myGameNotes[gameId] || '';
-    if (myGameNotes[gameId]) {
-         noteArea.classList.remove('hidden');
-    } else {
-        noteArea.classList.add('hidden');
-    }
-    
-    // 4. Update stats and UI
-    updateGameStats(gameId); // Increments count and updates modal stats
-    updateModalStatsUI(gameId); 
-
-    // 5. Show modal
-    modal.classList.remove('opacity-0', 'pointer-events-none');
-    modal.querySelector('.transform').classList.remove('scale-95');
-}
-
-/**
- * Closes the game modal and stops the game.
- */
-function closeGameModal() {
-    const modal = $('gameModal');
-    const iframe = $('modalGameIframe');
-    
-    // Stop the game by resetting iframe src
-    iframe.src = 'about:blank';
-    currentModalGameId = null;
-
-    // Hide modal
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    modal.querySelector('.transform').classList.add('scale-95');
-    
-    renderAll(); // Re-render to update the play count on the card
-}
-
-// --- CLOAKING (PANIC BUTTON) LOGIC ---
-
-/**
- * Toggles the cloak state (panic mode).
- */
 function toggleCloak() {
-    isCloaked = !isCloaked;
+    window.isCloaked = !window.isCloaked;
     const favicon = $('favicon');
     const appTitle = $('appTitle');
     
-    if (isCloaked) {
-        document.title = settings.cloakTitle;
-        favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>${settings.cloakFavicon}</text></svg>`;
-        document.body.classList.add('cloaked-mode'); // Use a class for full page styling if needed
+    if (window.isCloaked) {
+        document.title = State.data.settings.cloakTitle;
+        favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>${State.data.settings.cloakFavicon}</text></svg>`;
+        document.body.classList.add('cloaked-mode');
         customAlert('Cloaked mode activated!', "Shhh!", "info");
     } else {
-        document.title = "Unblocked Game Hub";
+        document.title = CONFIG.APP_NAME;
         favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>`;
         document.body.classList.remove('cloaked-mode');
         customAlert('Cloaked mode deactivated.', "Welcome Back", "info");
     }
 }
 
-// --- UTILITIES ---
+function closeGameModal() {
+    const modal = $('gameModal');
+    const iframe = $('modalGameIframe');
+    
+    iframe.src = 'about:blank';
+    window.currentModalGameId = null;
+    
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    modal.querySelector('.transform').classList.add('scale-95');
+    
+    Renderer.renderAll();
+}
 
-/**
- * Custom alert function to display temporary messages.
- * @param {string} message 
- * @param {string} title 
- * @param {'success'|'info'|'error'} type 
- */
 function customAlert(message, title, type = 'success') {
     const modal = $('customAlertModal');
-    const titleEl = $('alertTitle');
-    const messageEl = $('alertMessage');
-    const iconEl = $('alertIcon');
+    if (!modal) return;
+    
+    const types = {
+        success: { color: 'border-accent', icon: 'check-circle' },
+        error: { color: 'border-red-500', icon: 'x-circle' },
+        info: { color: 'border-blue-500', icon: 'info' },
+    };
+    
+    $('alertIcon').setAttribute('data-lucide', types[type].icon);
+    $('alertTitle').textContent = title;
+    $('alertMessage').textContent = message;
+    
     const alertBox = modal.querySelector('div[role="alert"]');
+    alertBox.className = alertBox.className.replace(/border-\w+-\d{3}/g, '');
+    alertBox.classList.add(types[type].color);
     
-    if (!modal || !titleEl || !messageEl || !iconEl || !alertBox) {
-        console.warn('Alert modal elements not found.');
-        return;
-    }
-
-    let colorClass, iconName;
-    
-    switch (type) {
-        case 'success':
-            colorClass = 'border-accent';
-            iconName = 'check-circle';
-            break;
-        case 'error':
-            colorClass = 'border-red-500';
-            iconName = 'x-circle';
-            break;
-        case 'info':
-        default:
-            colorClass = 'border-blue-500';
-            iconName = 'info';
-            break;
-    }
-
-    // Reset classes
-    alertBox.className = alertBox.className.replace(/border-(accent|red|blue)-\d{3}/g, '');
-    alertBox.classList.add(colorClass);
-
-    titleEl.textContent = title;
-    messageEl.textContent = message;
-    iconEl.setAttribute('data-lucide', iconName);
-    lucide.createIcons(); // Update the icon
-
-    // Show alert
     modal.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
-
-    // Hide after 3 seconds
+    lucide.createIcons();
+    
     setTimeout(() => {
         modal.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
     }, 3000);
 }
 
-
-// --- FILTERING AND SORTING ---
-
-/**
- * Filters and sorts an array of game objects based on global state.
- * @param {Array<Object>} games - The array of game objects to process.
- * @returns {Array<Object>} The filtered and sorted array of games.
- */
-function processGames(games) {
-    let processed = games;
-
-    // 1. Filter by Active Tags
-    const activeTags = currentTags.filter(tag => tag.active).map(tag => tag.name);
-    if (activeTags.length > 0) {
-        processed = processed.filter(game => 
-            activeTags.every(activeTag => (game.tags || []).includes(activeTag))
-        );
+function checkForUpdates() {
+    // Check if new games were added in the last week
+    const lastCheck = Utils.getStorageData('lastUpdateCheck', 0);
+    if (Date.now() - lastCheck > 7 * 24 * 60 * 60 * 1000) {
+        const newGames = Object.values(State.data.games).filter(g => 
+            (new Date() - new Date(g.created)) / (1000 * 60 * 60 * 24) < 7
+        ).length;
+        if (newGames > 0) {
+            customAlert(`${newGames} new games added this week!`, "Update", "info");
+        }
+        Utils.setStorageData('lastUpdateCheck', Date.now());
     }
-    
-    // 2. Filter by Search Query
-    if (currentSearchQuery) {
-        const query = currentSearchQuery.toLowerCase();
-        processed = processed.filter(game => 
-            game.title.toLowerCase().includes(query) || 
-            (game.description || '').toLowerCase().includes(query) ||
-            (game.tags || []).some(tag => tag.toLowerCase().includes(query))
-        );
-    }
-
-    // 3. Sort
-    switch (currentGameSort) {
-        case 'newest':
-            processed.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-            break;
-        case 'mostPlayed':
-            processed.sort((a, b) => (stats.counts[b.id] || 0) - (stats.counts[a.id] || 0));
-            break;
-        case 'name':
-        default:
-            processed.sort((a, b) => a.title.localeCompare(b.title));
-            break;
-    }
-
-    return processed;
 }
-
-/**
- * Toggles a single tag filter.
- * @param {string} tagName 
- */
-function toggleTagFilter(tagName) {
-    const tag = currentTags.find(t => t.name === tagName);
-    if (tag) {
-        tag.active = !tag.active;
-    }
-    renderAll();
-}
-
-/**
- * Clears all active tag filters.
- */
-function clearTagFilters() {
-    currentTags.forEach(tag => tag.active = false);
-    renderAll();
-}
-
-
-// --- ADMIN & DATA MANAGEMENT ---
-
-/**
- * Clears the add/edit game form.
- */
-function clearAddForm() {
-    $('addGameForm').reset();
-    $('gameIdInput').value = '';
-    $('saveGameBtn').textContent = 'Add Game';
-    $('saveGameBtn').classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-    $('saveGameBtn').classList.add('bg-accent', 'hover:opacity-90');
-    customAlert('Form cleared.', "Ready", "info");
-}
-
-/**
- * Exports all application data as a JSON file.
- */
-function exportData() {
-    const exportData = {
-        games: allGames,
-        settings: settings,
-        stats: stats,
-        user: hubUser,
-        favorites: myFavorites,
-        notes: myGameNotes,
-        ratings: myGameRatings
-    };
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `GameHub_Data_Export_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    customAlert('All data exported successfully!', "Export Complete", "success");
-}
-
-/**
- * Imports data from a JSON file.
- * @param {File} file 
- */
-function importData(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const imported = JSON.parse(e.target.result);
-            
-            // Overwrite existing data with imported data
-            allGames = imported.games || allGames;
-            settings = imported.settings || settings;
-            stats = imported.stats || stats;
-            hubUser = imported.user || hubUser;
-            myFavorites = imported.favorites || myFavorites;
-            myGameNotes = imported.notes || myGameNotes;
-            myGameRatings = imported.ratings || myGameRatings;
-
-            // Save to localStorage
-            setStorageData('hubGames', allGames);
-            setStorageData('hubSettings', settings);
-            setStorageData('hubStats', stats);
-            setStorageData('hubUser', hubUser);
-            setStorageData('myFavorites', myFavorites);
-            setStorageData('myGameNotes', myGameNotes);
-            setStorageData('myGameRatings', myGameRatings);
-
-            // Re-init to update theme/accent and re-render
-            initialize(); 
-            customAlert('Data imported successfully! The hub has been reloaded.', "Import Complete", "success");
-        } catch (error) {
-            console.error("Error importing data:", error);
-            customAlert(`Error importing data: ${error.message}`, "Import Error", "error");
-        }
-    };
-    reader.onerror = () => {
-        customAlert('Failed to read file.', "Import Error", "error");
-    };
-    reader.readAsText(file);
-    // Reset file input so same file can be selected again
-    $('importFileInput').value = '';
-}
-
-
-// --- EVENT LISTENERS ---
-
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        // --- Modal Elements ---
-        const gameModal = $('gameModal');
-        const closeModalBtn = $('closeModalBtn');
-        const modalNoteBtn = $('modalNoteBtn');
-        const modalNoteSaveBtn = $('modalNoteSaveBtn');
-        const modalNoteText = $('modalNoteText');
-        const modalNoteArea = $('modalNoteArea');
-        const profileModal = $('profileModal');
-        const settingsModal = $('settingsModal');
-        
-        // --- Game Modal Event Handlers ---
-        closeModalBtn.onclick = closeGameModal;
-        modalNoteBtn.onclick = () => {
-            if (modalNoteArea) {
-                modalNoteArea.classList.toggle('hidden');
-            }
-        };
-        modalNoteSaveBtn.onclick = () => {
-            const gameId = currentModalGameId;
-            if (gameId && modalNoteText && modalNoteArea) {
-                const note = modalNoteText.value.trim();
-                if (note) {
-                    myGameNotes[gameId] = note;
-                    customAlert('Note saved!', "Saved", "success");
-                    updateModalStatsUI(gameId); // Update note button icon
-                } else {
-                    delete myGameNotes[gameId];
-                    customAlert('Note cleared.', "Cleared", "info");
-                    modalNoteArea.classList.add('hidden'); // Hide if cleared
-                    updateModalStatsUI(gameId); // Update note button icon
-                }
-                setStorageData('myGameNotes', myGameNotes);
-            }
-        };
-        
-        // Modal Action Buttons (Rating, Favorite, Play Count)
-        const modalFavoriteBtn = $('modalFavoriteBtn');
-        const modalLikeBtn = $('modalLikeBtn');
-        const modalDislikeBtn = $('modalDislikeBtn');
-
-        // These handlers now rely on the fix in updateModalStatsUI for initial state,
-        // but their event listeners must also use checks if the elements exist.
-        if (modalLikeBtn) {
-            modalLikeBtn.onclick = () => {
-                if (currentModalGameId) toggleGameRating(currentModalGameId, 'like');
-            };
-        }
-        if (modalDislikeBtn) {
-            modalDislikeBtn.onclick = () => {
-                if (currentModalGameId) toggleGameRating(currentModalGameId, 'dislike');
-            };
-        }
-        if (modalFavoriteBtn) {
-            modalFavoriteBtn.onclick = () => {
-                if (currentModalGameId) toggleFavorite(currentModalGameId);
-            };
-        }
-
-
-        // Global listener for opening the game modal from cards
-        const appContainer = $('appContainer');
-        if (appContainer) {
-            appContainer.addEventListener('click', (e) => {
-                let target = e.target;
-                while (target !== appContainer && target !== null) {
-                    if (target.classList.contains('game-card') && target.dataset.gameId) {
-                        openGameModal(target.dataset.gameId);
-                        break;
-                    }
-                    target = target.parentNode;
-                }
-            });
-        }
-
-        // --- Header and Controls ---
-        $('sortSelect').onchange = (e) => { currentGameSort = e.target.value; renderAll(); };
-        $('searchInput').oninput = (e) => { currentSearchQuery = e.target.value; renderAll(); };
-        $('panicBtn').onclick = toggleCloak;
-
-        // Panic Button (Q keypress)
-        document.addEventListener('keydown', (e) => {
-            // Check if user is typing in an input or textarea
-            const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
-            if (e.key === 'q' && !isTyping) {
-                e.preventDefault();
-                toggleCloak();
-            }
-        });
-
-        // --- Profile Modal Logic ---
-        const profileBtn = $('profileBtn');
-        const userProfileSaveBtn = $('userProfileSaveBtn');
-        const userProfileCancelBtn = $('userProfileCancelBtn');
-        const userNicknameInput = $('userNicknameInput');
-        const userAvatarGrid = $('userAvatarGrid');
-        
-        function openProfileModal() {
-            if (!profileModal) return;
-            userNicknameInput.value = hubUser.nickname;
-            
-            // Render avatar grid
-            userAvatarGrid.innerHTML = AVATARS.map(avatar => 
-                `<button type="button" class="avatar-btn ${hubUser.avatar === avatar ? 'active' : ''}" data-avatar="${avatar}">
-                    ${avatar}
-                </button>`
-            ).join('');
-
-            // Add avatar selection handler
-            userAvatarGrid.querySelectorAll('.avatar-btn').forEach(btn => {
-                btn.onclick = (e) => {
-                    userAvatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                };
-            });
-
-            profileModal.classList.remove('opacity-0', 'pointer-events-none');
-            profileModal.querySelector('.transform').classList.remove('scale-95');
-        }
-
-        function closeProfileModal() {
-            if (!profileModal) return;
-            profileModal.classList.add('opacity-0', 'pointer-events-none');
-            profileModal.querySelector('.transform').classList.add('scale-95');
-        }
-
-        profileBtn.onclick = openProfileModal;
-        userProfileCancelBtn.onclick = closeProfileModal;
-        userProfileSaveBtn.onclick = () => {
-            const newNickname = userNicknameInput.value.trim();
-            const activeAvatarBtn = userAvatarGrid.querySelector('.avatar-btn.active');
-            const newAvatar = activeAvatarBtn ? activeAvatarBtn.dataset.avatar : hubUser.avatar;
-            
-            if (newNickname) {
-                hubUser.nickname = newNickname;
-                hubUser.avatar = newAvatar;
-                setStorageData('hubUser', hubUser);
-                customAlert('Profile saved!', "Success", "success");
-                renderNavigation(); // Update header avatar
-                closeProfileModal();
-            } else {
-                customAlert('Nickname cannot be empty.', "Error", "error");
-            }
-        };
-
-        // --- Settings/Admin Modal Logic ---
-        const settingsCloseBtn = $('settingsCloseBtn');
-        const settingsTabButtons = [$('tabGeneral'), $('tabAdmin')];
-        const settingsContentAreas = [$('contentGeneral'), $('contentAdmin')];
-        const themeRadios = [$('themeLight'), $('themeDark')];
-        const accentColorGrid = $('accentColorGrid');
-        const cloakTitleInput = $('cloakTitleInput');
-        const cloakFaviconInput = $('cloakFaviconInput');
-        const adminLoginBtn = $('adminLoginBtn');
-        const adminPassInput = $('adminPassInput');
-        const adminLoginArea = $('adminLoginArea');
-        const adminToolsArea = $('adminToolsArea');
-        const addGameForm = $('addGameForm');
-        const clearFormBtn = $('clearFormBtn');
-        const exportDataBtn = $('exportDataBtn');
-        const importDataBtn = $('importDataBtn');
-        const importFileInput = $('importFileInput');
-
-        function openSettingsModal() {
-            if (!settingsModal) return;
-            
-            // General Tab Setup
-            (settings.theme === 'dark' ? $('themeDark') : $('themeLight')).checked = true;
-            cloakTitleInput.value = settings.cloakTitle;
-            cloakFaviconInput.value = settings.cloakFavicon;
-            
-            // Accent Color Grid
-            accentColorGrid.innerHTML = Object.keys(ACCENT_COLORS).map(name => {
-                const color = ACCENT_COLORS[name].hex;
-                return `<button type="button" class="w-10 h-10 rounded-full border-4 ${settings.accent === name ? 'border-gray-900 dark:border-white' : 'border-transparent'}" style="background-color: ${color};" data-color-name="${name}" title="${name}"></button>`;
-            }).join('');
-
-            // Admin Tab Setup
-            // Restore last active tab (default to General)
-            settingsTabButtons.forEach(btn => {
-                const tabName = btn.id.replace('tab', 'content');
-                if (btn.classList.contains('border-accent')) {
-                    settingsContentAreas.forEach(area => area.classList.add('hidden'));
-                    $(tabName).classList.remove('hidden');
-                }
-            });
-
-            // Check admin status
-            if (sessionStorage.getItem('isAdmin') === 'true') {
-                adminLoginArea.classList.add('hidden');
-                adminToolsArea.classList.remove('hidden');
-            } else {
-                adminLoginArea.classList.remove('hidden');
-                adminToolsArea.classList.add('hidden');
-            }
-
-            settingsModal.classList.remove('opacity-0', 'pointer-events-none');
-            settingsModal.querySelector('.transform').classList.remove('scale-95');
-        }
-
-        function closeSettingsModal() {
-            if (!settingsModal) return;
-            settingsModal.classList.add('opacity-0', 'pointer-events-none');
-            settingsModal.querySelector('.transform').classList.add('scale-95');
-        }
-        
-        // Tab switching
-        settingsTabButtons.forEach(btn => {
-            btn.onclick = () => {
-                settingsTabButtons.forEach(b => {
-                    b.classList.remove('text-accent', 'border-accent');
-                    b.classList.add('text-gray-500', 'dark:text-gray-400');
-                });
-                settingsContentAreas.forEach(c => c.classList.add('hidden'));
-
-                btn.classList.add('text-accent', 'border-accent');
-                btn.classList.remove('text-gray-500', 'dark:text-gray-400');
-                
-                const targetId = btn.id.replace('tab', 'content');
-                $(targetId).classList.remove('hidden');
-            };
-        });
-
-        $('settingsBtn').onclick = openSettingsModal;
-        settingsCloseBtn.onclick = closeSettingsModal;
-
-        // Theme and Accent changes
-        themeRadios.forEach(radio => {
-            radio.onchange = (e) => {
-                updateTheme(e.target.value);
-            };
-        });
-        accentColorGrid.onclick = (e) => {
-            let target = e.target;
-            while (target !== accentColorGrid && target !== null) {
-                if (target.dataset.colorName) {
-                    updateAccentColor(target.dataset.colorName);
-                    // Update borders
-                    accentColorGrid.querySelectorAll('button').forEach(btn => {
-                        btn.classList.remove('border-gray-900', 'dark:border-white');
-                        btn.classList.add('border-transparent');
-                    });
-                    target.classList.remove('border-transparent');
-                    target.classList.add('border-gray-900', 'dark:border-white');
-                    break;
-                }
-                target = target.parentNode;
-            }
-        };
-
-        // Cloaking settings save
-        cloakTitleInput.oninput = (e) => {
-            settings.cloakTitle = e.target.value.trim() || 'Google Docs';
-            setStorageData('hubSettings', settings);
-        };
-        cloakFaviconInput.oninput = (e) => {
-            settings.cloakFavicon = e.target.value.trim().slice(0, 1) || '📄';
-            setStorageData('hubSettings', settings);
-        };
-        
-        // Admin Login
-        adminLoginBtn.onclick = () => {
-            if (adminPassInput.value === ADMIN_PASS) {
-                sessionStorage.setItem('isAdmin', 'true');
-                adminLoginArea.classList.add('hidden');
-                adminToolsArea.classList.remove('hidden');
-                customAlert('Admin access granted!', "Welcome", "success");
-            } else {
-                customAlert('Incorrect password.', "Access Denied", "error");
-            }
-            adminPassInput.value = '';
-        };
-
-        // Admin: Add/Edit Game
-        addGameForm.onsubmit = (e) => {
-            e.preventDefault();
-            try {
-                const id = $('gameIdInput').value;
-                const title = $('gameTitleInput').value.trim();
-                const url = $('gameUrlInput').value.trim();
-                const image = $('gameImageInput').value.trim() || `https://placehold.co/400x300/4f46e5/ffffff?text=${encodeURIComponent(title)}`;
-                const description = $('gameDescriptionInput').value.trim() || 'No description provided.';
-                const tags = ($('gameTagsInput').value.trim() || '').split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
-                const section = $('gameSectionSelect').value;
-
-                const gameData = { title, url, image, description, tags, section };
-
-                if (id) {
-                    // Edit existing game
-                    allGames[id] = { ...allGames[id], ...gameData };
-                    customAlert(`Game "${title}" updated!`, "Success", "success");
-                } else {
-                    // Add new game
-                    const newId = `g_${new Date().getTime()}`;
-                    allGames[newId] = { id: newId, ...gameData, created: new Date().toISOString() };
-                    customAlert(`Game "${title}" added!`, "Success", "success");
-                }
-                
-                setStorageData('hubGames', allGames);
-                initialize(); // Re-initialize to update tags and re-render
-                clearAddForm();
-            } catch (error) {
-                console.error("Error saving game:", error);
-                customAlert(`Error saving game: ${error.message}`, "Error", "error");
-            }
-        };
-        clearFormBtn.onclick = clearAddForm;
-
-        // Admin: Data
-        exportDataBtn.onclick = exportData;
-        importDataBtn.onclick = () => importFileInput.click();
-        importFileInput.onchange = (e) => {
-            if (e.target.files.length > 0) {
-                importData(e.target.files[0]);
-            }
-        };
-
-        // Run the main app initialization
-        initialize();
-        // Remove loading screen after successful initialization
-        $('loadingModal').classList.add('opacity-0');
-        setTimeout(() => {
-            $('loadingModal').classList.add('hidden');
-        }, 300);
-
-        console.log("App initialized successfully.");
-        
-    } catch (err) {
-        console.error("A fatal error occurred during initialization:", err);
-        // Show a user-friendly error message
-        $('loadingModal').innerHTML = `
-            <div class="p-4 bg-red-800 border-4 border-red-500 rounded-lg">
-                <h2 class="text-xl font-bold text-white">Error: Could not load the application.</h2>
-                <p class="mt-2 text-red-100">Check the console (F12) for details.</p>
-            </div>`;
-    }
-});
