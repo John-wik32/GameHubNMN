@@ -1009,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // User Profile Modal
     if(userProfileButton) userProfileButton.onclick = openUserProfileModal;
-    if(userProfileCancelBtn) userProfileCancelBtn.onclick = ()D => userProfileModal.classList.add('hidden');
+    if(userProfileCancelBtn) userProfileCancelBtn.onclick = () => userProfileModal.classList.add('hidden');
     // Save button is assigned inside renderAvatarGrid
 
     // Settings Modal
