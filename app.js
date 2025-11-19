@@ -295,13 +295,9 @@ function renderNavigation() {
     const navItems = [
         { id: 'home', name: 'Home', icon: 'home' },
         { id: 'favorites', name: 'Favorites', icon: 'heart' },
-        { id: 'tags', name: 'Tags', icon: 'tag' }
+        { id: 'tags', name: 'Tags', icon: 'tag' },
+        { id: 'admin', name: 'Admin', icon: 'lock' } // ALWAYS show the admin link
     ];
-
-    const isAdmin = getStorageData('isAdmin', false);
-    if (isAdmin) {
-        navItems.push({ id: 'admin', name: 'Admin', icon: 'lock' });
-    }
 
     desktopNav.innerHTML = '';
     const mobileNavContainer = mobileNav.querySelector('.flex-col');
@@ -446,12 +442,15 @@ function renderGameSections() {
     Object.keys(sectionTitles).forEach(sectionKey => {
         const games = sections[sectionKey] || [];
         if (games.length > 0) {
-            games.sort((a, b) => a.title.localeCompare(b.title));
+            
+            // Filter and Sort Games (NEW)
+            const processedGames = processGames(games);
+
             const sectionHTML = `
                 <section id="section-${sectionKey}" class="mt-8">
                     <h2 class="text-3xl font-bold text-gray-900 dark:text-white">${sectionTitles[sectionKey]}</h2>
                     <div class="grid grid-cols-1 gap-6 mt-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                        ${games.map(game => renderGameCard(game.id)).join('')}
+                        ${processedGames.map(game => renderGameCard(game.id)).join('')}
                     </div>
                 </section>
             `;
@@ -487,12 +486,21 @@ function renderRecentlyPlayed() {
 
 function renderFavoritesPage() {
     if (!favoritesGrid) return;
-    const favoriteGames = myFavorites.map(id => allGames[id]).filter(Boolean).sort((a, b) => a.title.localeCompare(b.title));
-    if (favoriteGames.length === 0) {
-        favoritesGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">You haven\'t added any favorites yet. Click the ⭐ on a game card to save it here!</p>';
+    
+    const favoriteGameObjects = myFavorites.map(id => allGames[id]).filter(Boolean);
+    
+    // Filter and Sort Games (NEW)
+    const processedGames = processGames(favoriteGameObjects);
+
+    if (processedGames.length === 0) {
+        if (currentSearchQuery) {
+            favoritesGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">No favorites match your search.</p>';
+        } else {
+            favoritesGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">You haven\'t added any favorites yet. Click the ⭐ on a game card to save it here!</p>';
+        }
         return;
     }
-    favoritesGrid.innerHTML = favoriteGames.map(game => renderGameCard(game.id)).join('');
+    favoritesGrid.innerHTML = processedGames.map(game => renderGameCard(game.id)).join('');
 }
 
 function renderTagsPage() {
@@ -537,6 +545,41 @@ function renderAdminList() {
     `).join('');
     lucide.createIcons();
 }
+
+// --- NEW HELPER FUNCTION FOR SORTING/FILTERING ---
+
+/**
+ * Filters and sorts an array of game objects based on global state.
+ * @param {Array<Object>} games - The array of game objects to process.
+ * @returns {Array<Object>} The filtered and sorted array of games.
+ */
+function processGames(games) {
+    let processed = games;
+
+    // 1. Filter by Search Query
+    if (currentSearchQuery) {
+        processed = processed.filter(game => 
+            game.title.toLowerCase().includes(currentSearchQuery.toLowerCase())
+        );
+    }
+
+    // 2. Sort
+    switch (currentGameSort) {
+        case 'newest':
+            processed.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+            break;
+        case 'mostPlayed':
+            processed.sort((a, b) => (stats.counts[b.id] || 0) - (stats.counts[a.id] || 0));
+            break;
+        case 'name':
+        default:
+            processed.sort((a, b) => a.title.localeCompare(b.title));
+            break;
+    }
+
+    return processed;
+}
+
 
 // --- GAME MODAL LOGIC ---
 
@@ -939,6 +982,10 @@ document.addEventListener('DOMContentLoaded', () => {
     saveCloakSettingsBtn = $("saveCloakSettingsBtn");
     panicButton = $("panicButton");
 
+    // --- NEW: Search and Sort Elements ---
+    const searchBar = $("searchBar");
+    const sortSelect = $("sortSelect");
+
     // --- ATTACH EVENT LISTENERS ---
     // Now that all functions are defined globally and elements are found,
     // we can safely attach the listeners.
@@ -961,6 +1008,21 @@ document.addEventListener('DOMContentLoaded', () => {
             mobileNav.classList.add('hidden');
         }
     };
+
+    // --- NEW: Search and Sort Listeners ---
+    if(searchBar) {
+        searchBar.addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value;
+            renderAll(); // Re-render all game lists
+        });
+    }
+
+    if(sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            currentGameSort = e.target.value;
+            renderAll(); // Re-render all game lists
+        });
+    }
 
     // Game Modal Listeners
     if(modalCloseBtn) modalCloseBtn.onclick = closeGameModal;
