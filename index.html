@@ -1,326 +1,334 @@
 <!DOCTYPE html>
-<html lang="en"> <!-- 'dark' class will be added here by JS -->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unblocked Game Hub</title>
-    <!-- Favicon (will be changed by panic button) -->
     <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
     
-    <!-- Load Tailwind CSS -->
+    <!-- Meta for PWA -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="description" content="Collection of unblocked games with personalization">
+    <link rel="manifest" href="manifest.json">
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <!--
-    CRITICAL: This config script MUST come after loading Tailwind
-    It tells Tailwind how to handle dark mode.
-    -->
     <script>
         tailwind.config = {
-            darkMode: 'class', // This enables 'dark:' classes
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        // Custom accent color is added via CSS variables
                         'accent': 'var(--accent-color)',
                     },
-                    // You can extend your theme here if needed
                 }
             }
         }
     </script>
     
-    <!-- Load Google Font (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Load Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Load Custom Styles -->
-    <link rel="stylesheet" href="style.css" type="text/css" />
-    
+    <style>
+        /* Add to style.css */
+        .cloaked-mode {
+            filter: blur(2px) brightness(0.8);
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* Smooth transitions */
+        * {
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+    </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300 min-h-screen text-gray-900 dark:text-white font-inter">
-
-    <!-- Main Content Wrapper -->
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-white font-[Inter]">
     <div id="appContainer" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <!-- Header & Controls -->
         <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div class="flex items-center space-x-3">
                 <i data-lucide="ghost" class="w-8 h-8 text-accent"></i>
-                <h1 class="text-3xl font-bold">Game Hub</h1>
+                <h1 id="appTitle" class="text-3xl font-bold">Game Hub</h1>
+                <!-- Version badge -->
+                <span class="text-xs px-2 py-1 bg-accent text-white rounded-full">v2.0</span>
             </div>
             
-            <!-- Search, Sort, and Actions -->
             <div class="flex items-center space-x-3 w-full md:w-auto">
+                <!-- Search with random button -->
                 <div class="relative w-full">
-                    <input type="text" id="searchInput" placeholder="Search games..." class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 focus:ring-accent focus:border-accent">
+                    <input type="text" id="searchInput" placeholder="Search games..." 
+                           class="w-full pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 focus:ring-accent focus:border-accent">
                     <i data-lucide="search" class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <!-- Random button inserted by JS if enabled -->
                 </div>
                 
-                <!-- Sort Dropdown -->
-                <select id="sortSelect" class="py-2 pl-3 pr-8 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-sm focus:ring-accent focus:border-accent appearance-none">
-                    <option value="name">Name</option>
-                    <option value="newest">Newest</option>
-                    <option value="mostPlayed">Popularity</option>
+                <select id="sortSelect" class="py-2 pl-3 pr-8 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800 text-sm focus:ring-accent focus:border-accent">
+                    <option value="name">Name (A-Z)</option>
+                    <option value="newest">Newest First</option>
+                    <option value="mostPlayed">Most Played</option>
+                    <option value="random">Random Order</option>
                 </select>
                 
-                <!-- Action Buttons -->
-                <button id="profileBtn" title="Profile" class="p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <!-- Action buttons -->
+                <button id="profileBtn" class="p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                     <i data-lucide="user" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>
                 </button>
-                <button id="settingsBtn" title="Settings & Admin" class="p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <button id="settingsBtn" class="p-2 rounded-full bg-white dark:bg-gray-800 shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                     <i data-lucide="settings" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>
                 </button>
-                <button id="panicBtn" title="Panic Button (Press Q)" class="p-2 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-colors">
+                <button id="panicBtn" class="p-2 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-colors animate-pulse">
                     <i data-lucide="shield-alert" class="w-5 h-5"></i>
                 </button>
             </div>
         </header>
 
-        <!-- Tag Filters (Injected by JS) -->
-        <div id="tagFilters" class="mb-8 flex flex-wrap gap-2">
-            <!-- Tags will be rendered here -->
+        <!-- Quick stats bar -->
+        <div class="mb-6 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg flex justify-between text-sm">
+            <span id="totalGames">0 Games</span>
+            <span id="totalPlays">0 Plays</span>
+            <span id="favoriteCount">0 Favorites</span>
         </div>
 
-        <!-- Game Sections (Main Content) -->
+        <!-- Tag Filters -->
+        <div id="tagFilters" class="mb-8 flex flex-wrap gap-2">
+            <!-- Rendered by JS -->
+        </div>
+
+        <!-- Game Content -->
         <div id="gameContent" class="space-y-12">
-            <!-- Game cards will be rendered here -->
+            <!-- Rendered by JS -->
         </div>
     </div>
 
-    <!-- --- MODALS --- -->
-
-    <!-- 1. Custom Alert/Message Modal -->
+    <!-- Custom Alert Modal -->
     <div id="customAlertModal" class="fixed inset-0 z-50 flex items-start justify-center p-4 transition-all duration-300 pointer-events-none opacity-0 translate-y-4">
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-2xl max-w-sm w-full border-t-4 border-accent" role="alert">
             <div class="flex items-start space-x-3">
-                <i id="alertIcon" data-lucide="check-circle" class="w-6 h-6 text-accent flex-shrink-0"></i>
+                <i id="alertIcon" class="w-6 h-6 text-accent flex-shrink-0"></i>
                 <div class="flex-grow">
                     <p id="alertTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Success</p>
-                    <p id="alertMessage" class="mt-1 text-sm text-gray-600 dark:text-gray-400">Operation successful.</p>
+                    <p id="alertMessage" class="mt-1 text-sm text-gray-600 dark:text-gray-400">Operation completed.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 2. Game Modal -->
+    <!-- Game Modal -->
     <div id="gameModal" class="fixed inset-0 z-40 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full h-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col transform scale-95 transition-transform duration-300" role="dialog" aria-modal="true">
-            
-            <!-- Modal Header -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full h-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col transform scale-95 transition-transform duration-300">
             <div class="flex-shrink-0 p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <h2 id="modalTitle" class="text-2xl font-bold truncate text-gray-900 dark:text-white">Game Title</h2>
-                    <div id="modalTags" class="flex flex-wrap gap-1">
-                        <!-- Tags rendered here -->
-                    </div>
+                    <div id="modalTags" class="flex flex-wrap gap-1"></div>
                 </div>
-                
-                <!-- Action Buttons (CRITICAL IDs HERE) -->
                 <div class="flex items-center space-x-3">
-                    <!-- Stats Count -->
                     <span id="modalStatsCount" class="flex items-center text-sm font-medium text-gray-500 dark:text-gray-400">
-                        <i data-lucide="play" class="w-4 h-4 mr-1"></i>
-                        <span>0</span>
+                        <i data-lucide="play" class="w-4 h-4 mr-1"></i><span>0</span>
                     </span>
-
-                    <!-- Like Button -->
-                    <button id="modalLikeBtn" title="Like Game" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-accent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button id="modalLikeBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <i data-lucide="thumbs-up" class="w-5 h-5"></i>
                     </button>
-                    <!-- Dislike Button -->
-                    <button id="modalDislikeBtn" title="Dislike Game" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button id="modalDislikeBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <i data-lucide="thumbs-down" class="w-5 h-5"></i>
                     </button>
-                    
-                    <!-- Favorite Button -->
-                    <button id="modalFavoriteBtn" title="Add to Favorites" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button id="modalFavoriteBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <i data-lucide="heart" class="w-5 h-5"></i>
                     </button>
-
-                    <!-- Note Button -->
-                    <button id="modalNoteBtn" title="Add Note" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button id="modalNoteBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <i data-lucide="sticky-note" class="w-5 h-5"></i>
                     </button>
-
-                    <!-- Close Button -->
-                    <button id="closeModalBtn" title="Close" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <button id="closeModalBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <i data-lucide="x" class="w-6 h-6"></i>
                     </button>
                 </div>
             </div>
-
-            <!-- Modal Content (Game and Note Area) -->
             <div class="flex-grow flex flex-col md:flex-row overflow-hidden">
-                <!-- Game Iframe Area -->
                 <div class="flex-grow relative overflow-hidden bg-gray-200 dark:bg-gray-900">
                     <iframe id="modalGameIframe" src="" frameborder="0" allowfullscreen class="w-full h-full"></iframe>
                 </div>
-
-                <!-- Note/Description Sidebar -->
                 <div id="modalNoteArea" class="flex-shrink-0 w-full md:w-80 bg-gray-50 dark:bg-gray-800 border-t md:border-t-0 md:border-l border-gray-100 dark:border-gray-700 p-4 overflow-y-auto hidden">
                     <h3 class="text-lg font-semibold mb-2">My Private Note</h3>
                     <textarea id="modalNoteText" rows="6" placeholder="Write your thoughts or strategies here..." class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-accent focus:border-accent"></textarea>
                     <button id="modalNoteSaveBtn" class="w-full mt-2 py-2 text-white font-semibold rounded-lg bg-accent hover:opacity-90 transition-opacity">Save Note</button>
-                    
-                    <h3 class="text-lg font-semibold mt-4 mb-2">Description</h3>
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Game Controls</h3>
+                    <p id="modalControls" class="text-sm text-gray-600 dark:text-gray-400 mb-4"></p>
+                    <h3 class="text-lg font-semibold mb-2">Description</h3>
                     <p id="modalDescription" class="text-sm text-gray-600 dark:text-gray-400"></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 3. Profile Modal (Hidden by default) -->
+    <!-- Profile Modal -->
     <div id="profileModal" class="fixed inset-0 z-40 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-transform duration-300" role="dialog" aria-modal="true">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 transform scale-95 transition-transform duration-300">
             <h2 class="text-2xl font-bold mb-4 border-b pb-2 border-gray-100 dark:border-gray-700">My Profile</h2>
-            
             <div class="space-y-4">
-                <!-- Nickname -->
                 <div>
                     <label for="userNicknameInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nickname</label>
-                    <input type="text" id="userNicknameInput" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Player">
+                    <input type="text" id="userNicknameInput" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Player">
                 </div>
-
-                <!-- Avatar -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Choose an Avatar</label>
-                    <div id="userAvatarGrid" class="grid grid-cols-8 gap-2 mt-2">
-                        <!-- Avatars injected by JS -->
-                    </div>
+                    <div id="userAvatarGrid" class="grid grid-cols-8 gap-2 mt-2"></div>
+                </div>
+                <div>
+                    <label for="panicKeySelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Panic Button Key</label>
+                    <select id="panicKeySelect" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="q">Q Key</option>
+                        <option value="Escape">Escape Key</option>
+                        <option value="F1">F1 Key</option>
+                    </select>
                 </div>
             </div>
-
             <div class="flex justify-end mt-6">
-                <button id="userProfileSaveBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90 transition-colors">Save</button>
+                <button id="userProfileSaveBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90 transition-opacity">Save</button>
                 <button id="userProfileCancelBtn" class="px-4 py-2 ml-3 font-semibold text-gray-700 dark:text-gray-900 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Cancel</button>
             </div>
         </div>
     </div>
-    
-    <!-- 4. Settings/Admin Modal (Hidden by default) -->
-    <div id="settingsModal" class="fixed inset-0 z-40 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full p-6 transform scale-95 transition-transform duration-300" role="dialog" aria-modal="true">
-            <h2 class="text-2xl font-bold mb-4 border-b pb-2 border-gray-100 dark:border-gray-700">Settings & Admin</h2>
-            
-            <!-- Tabs -->
-            <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
-                <button id="tabGeneral" class="tab-button px-4 py-2 font-semibold text-accent border-b-2 border-accent transition-colors">General</button>
-                <button id="tabAdmin" class="tab-button px-4 py-2 font-semibold text-gray-500 dark:text-gray-400 transition-colors">Admin</button>
-            </div>
 
-            <!-- Tab Content -->
+    <!-- Settings/Admin Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-40 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full p-6 transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-4 border-b pb-2 border-gray-100 dark:border-gray-700">Settings & Admin</h2>
+            <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                <button id="tabGeneral" class="tab-button px-4 py-2 font-semibold text-accent border-b-2 border-accent">General</button>
+                <button id="tabAdmin" class="tab-button px-4 py-2 font-semibold text-gray-500 dark:text-gray-400">Admin</button>
+                <button id="tabAnalytics" class="tab-button px-4 py-2 font-semibold text-gray-500 dark:text-gray-400">Analytics</button>
+            </div>
             <div id="settingsContent">
-                
-                <!-- General Tab Content -->
+                <!-- General Tab -->
                 <div id="contentGeneral" class="space-y-6">
-                    <!-- Theme Selector -->
                     <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         <h3 class="font-semibold text-lg mb-2">Appearance</h3>
                         <div class="flex space-x-4">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="radio" name="theme" value="light" id="themeLight" class="text-accent focus:ring-accent">
-                                <span class="text-gray-700 dark:text-gray-300">Light</span>
+                                <span>Light</span>
                             </label>
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="radio" name="theme" value="dark" id="themeDark" class="text-accent focus:ring-accent">
-                                <span class="text-gray-700 dark:text-gray-300">Dark</span>
+                                <span>Dark</span>
                             </label>
                         </div>
                     </div>
-                    
-                    <!-- Accent Color Picker -->
                     <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         <h3 class="font-semibold text-lg mb-2">Accent Color</h3>
-                        <div id="accentColorGrid" class="grid grid-cols-6 gap-3">
-                            <!-- Color Swatches injected by JS -->
-                        </div>
+                        <div id="accentColorGrid" class="grid grid-cols-6 gap-3"></div>
                     </div>
-
-                    <!-- Panic Cloaking Settings -->
                     <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         <h3 class="font-semibold text-lg mb-2">Panic Button Settings</h3>
                         <div class="space-y-3">
                             <div>
-                                <label for="cloakTitleInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cloaked Page Title</label>
-                                <input type="text" id="cloakTitleInput" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Google Docs">
+                                <label for="cloakTitleInput" class="block text-sm font-medium">Cloaked Page Title</label>
+                                <input type="text" id="cloakTitleInput" class="block w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md">
                             </div>
                             <div>
-                                <label for="cloakFaviconInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cloaked Favicon (Emoji)</label>
-                                <input type="text" id="cloakFaviconInput" maxlength="1" class="block w-16 text-center px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="📄">
+                                <label for="cloakFaviconInput" class="block text-sm font-medium">Cloaked Favicon (Emoji)</label>
+                                <input type="text" id="cloakFaviconInput" maxlength="1" class="block w-16 text-center px-3 py-2 mt-1 border border-gray-300 dark:border-gray-600 rounded-md">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Admin Tab Content -->
+                <!-- Admin Tab -->
                 <div id="contentAdmin" class="space-y-6 hidden">
-                    
-                    <!-- Admin Login -->
                     <div id="adminLoginArea" class="p-4 bg-red-50 dark:bg-gray-900/50 rounded-lg border border-red-200 dark:border-gray-700">
                         <h3 class="font-semibold text-lg mb-2">Admin Access</h3>
                         <div class="flex space-x-3">
-                            <input type="password" id="adminPassInput" class="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Enter Admin Password">
-                            <button id="adminLoginBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-red-600 hover:bg-red-700 transition-colors">Login</button>
+                            <input type="password" id="adminPassInput" class="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md" placeholder="Enter Admin Password">
+                            <button id="adminLoginBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-red-600 hover:bg-red-700">Login</button>
                         </div>
                     </div>
-
-                    <!-- Admin Tools (Visible after login) -->
                     <div id="adminToolsArea" class="hidden space-y-6">
-                        
-                        <!-- Add Game Form -->
                         <div class="p-4 bg-yellow-50 dark:bg-gray-900/50 rounded-lg border border-yellow-200 dark:border-gray-700">
                             <h3 class="font-semibold text-lg mb-3">Add/Edit Game</h3>
                             <form id="addGameForm" class="space-y-3">
                                 <input type="hidden" id="gameIdInput">
-                                <div><input type="text" id="gameTitleInput" placeholder="Title (e.g., Flappy Bird)" required class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></div>
-                                <div><input type="url" id="gameUrlInput" placeholder="Embed URL (e.g., https://example.com/game.html)" required class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></div>
-                                <div><input type="url" id="gameImageInput" placeholder="Image URL (e.g., https://placehold.co/400x300)" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></div>
-                                <div><textarea id="gameDescriptionInput" placeholder="Short description..." rows="2" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></textarea></div>
-                                <div><input type="text" id="gameTagsInput" placeholder="Tags (comma separated, e.g., action, skill, 2d)" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></div>
-                                <div>
-                                    <label for="gameSectionSelect" class="text-sm font-medium">Section:</label>
-                                    <select id="gameSectionSelect" class="ml-2 px-3 py-1 border rounded-md dark:bg-gray-700">
-                                        <option value="recommended">Recommended</option>
-                                        <option value="featured">Featured</option>
-                                        <option value="sports">Sports</option>
-                                    </select>
-                                </div>
+                                <input type="text" id="gameTitleInput" placeholder="Title *" required class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                <input type="url" id="gameUrlInput" placeholder="Embed URL * (https://...)" required class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                <input type="url" id="gameImageInput" placeholder="Image URL (optional)" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                <textarea id="gameDescriptionInput" placeholder="Description..." rows="2" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700"></textarea>
+                                <input type="text" id="gameTagsInput" placeholder="Tags (comma separated)" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                <input type="text" id="gameControlsInput" placeholder="Controls (e.g., Arrow Keys: Move)" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                <select id="gameSectionSelect" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700">
+                                    <option value="recommended">Recommended</option>
+                                    <option value="featured">Featured</option>
+                                    <option value="sports">Sports</option>
+                                    <option value="puzzle">Puzzle</option>
+                                    <option value="action">Action</option>
+                                    <option value="other">Other</option>
+                                </select>
                                 <div class="flex justify-end space-x-3">
                                     <button type="button" id="clearFormBtn" class="px-4 py-2 font-semibold text-gray-700 bg-gray-300 rounded-md hover:bg-gray-400">Clear</button>
                                     <button type="submit" id="saveGameBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-accent hover:opacity-90">Add Game</button>
                                 </div>
                             </form>
                         </div>
-
-                        <!-- Data Management -->
                         <div class="p-4 bg-blue-50 dark:bg-gray-900/50 rounded-lg border border-blue-200 dark:border-gray-700">
                             <h3 class="font-semibold text-lg mb-3">Data Management</h3>
-                            <div class="flex space-x-3">
-                                <button id="exportDataBtn" class="flex-grow px-4 py-2 font-semibold text-white rounded-md bg-blue-600 hover:bg-blue-700 transition-colors">Export Data (JSON)</button>
-                                <button id="importDataBtn" class="flex-grow px-4 py-2 font-semibold text-white rounded-md bg-purple-600 hover:bg-purple-700 transition-colors">Import Data</button>
+                            <div class="flex space-x-3 flex-wrap gap-3">
+                                <button id="exportDataBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-blue-600 hover:bg-blue-700">Export Data</button>
+                                <button id="importDataBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-purple-600 hover:bg-purple-700">Import Data</button>
                                 <input type="file" id="importFileInput" accept=".json" class="hidden">
+                                <button id="backupBtn" class="px-4 py-2 font-semibold text-white rounded-md bg-green-600 hover:bg-green-700">Auto-Backup</button>
                             </div>
+                        </div>
+                        <div class="p-4 bg-orange-50 dark:bg-gray-900/50 rounded-lg border border-orange-200 dark:border-gray-700">
+                            <h3 class="font-semibold text-lg mb-3">Tag Management</h3>
+                            <div id="tagManager" class="space-y-2"></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
+                <!-- Analytics Tab -->
+                <div id="contentAnalytics" class="space-y-6 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <h3 class="text-2xl font-bold text-accent" id="analyticsTotalGames">0</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Total Games</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <h3 class="text-2xl font-bold text-accent" id="analyticsTotalPlays">0</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Total Plays</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <h3 class="text-2xl font-bold text-accent" id="analyticsTotalUsers">1</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Active Users (this device)</p>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-2">Most Popular Games</h3>
+                        <ol id="popularGamesList" class="list-decimal list-inside space-y-1"></ol>
+                    </div>
+                    <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-2">Reported Games</h3>
+                        <div id="reportedGamesList" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end mt-6 border-t pt-4 border-gray-100 dark:border-gray-700">
-                <button id="settingsCloseBtn" class="px-4 py-2 font-semibold text-gray-700 dark:text-gray-900 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Close</button>
+                <button id="settingsCloseBtn" class="px-4 py-2 font-semibold text-gray-700 dark:text-gray-900 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600">Close</button>
             </div>
         </div>
     </div>
-    
-    <!-- 5. Loading/Overlay Modal -->
+
+    <!-- Loading Modal -->
     <div id="loadingModal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center p-4 transition-opacity duration-300">
         <div class="loader mb-4"></div>
-        <p class="text-white text-lg font-semibold">Loading Hub Data...</p>
+        <p class="text-white text-lg font-semibold animate-pulse">Loading Game Hub...</p>
+        <p class="text-gray-400 text-sm mt-2">Building your experience</p>
     </div>
 
-    <!-- The core application script -->
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
