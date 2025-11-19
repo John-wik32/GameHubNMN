@@ -4,46 +4,32 @@ let settings = {};
 let stats = { 
     counts: {}, 
     recent: [],
-    ratings: { likes: {}, dislikes: {} },
-    reports: {}
+    ratings: { like: {}, dislike: {} }, // Stores all users' ratings globally
+    reports: {} 
 };
 let localRecent = []; // For storing recently played game IDs locally
 let myFavorites = []; // For storing favorite game IDs
 let myGameNotes = {}; // For private game notes
-let myGameRatings = {}; // For user's own ratings
-let hubUser = { nickname: 'Player', avatar: '🎮' };
-let currentTheme = 'light';
-let isCloaked = false;
-let currentTags = [];
-let currentGameSort = 'name';
-let currentSearchQuery = '';
-let currentGameUrl = null;
-const NEW_GAME_DAYS = 7;
+let myGameRatings = {}; // Stores the current user's rating for each game
+let hubUser = { nickname: 'Player', avatar: '🎮' }; // User profile
+let currentTheme = 'light'; // For theme
+let isCloaked = false; // For panic button
+let currentTags = []; // For tag filtering
+let currentGameSort = 'name'; // For sorting
+let currentSearchQuery = ''; // For searching
+let currentGameUrl = null; // For game modal
+let currentModalGameId = null; // Stores the ID of the game currently in the modal
+const NEW_GAME_DAYS = 7; // How many days a game counts as "new"
 const ADMIN_PASS = '2025'; // The admin password
-
-// --- GLOBAL DOM VARIABLES ---
-// We declare them here so all functions can access them
-let doc, appWrapper, favicon, desktopNav, mobileNav, mobileMenuButton,
-    gameSectionsContainer, authStatus, authMessage, themeToggle,
-    userProfileButton, userProfileAvatar, userProfileName, loadingModal, pages,
-    pageHome, homeDesc, featuredGameContainer, recentlyPlayedGrid,
-    favoritesGrid, pageFavorites, pageTags, tagsPageGrid, adminPanel,
-    adminLogin, adminPasswordInput, adminLoginBtn, adminTools, gameForm,
-    gameIdInput, gameTitleInput, gameSectionInput, gameDescriptionInput,
-    gameTagsInput, gameUrlInput, saveGameBtn, clearFormBtn,
-    existingGamesList, exportDataBtn, importDataBtn, importFileInput,
-    alertModal, gameModal, modalGameTitle, gameIframe, modalCloseBtn,
-    modalNewWindowBtn, modalLikeBtn, modalDislikeBtn, modalFavoriteBtn,
-    likeCountSpan, dislikeCountSpan, userProfileModal, userNicknameInput,
-    userAvatarGrid, userProfileSaveBtn, userProfileCancelBtn, settingsModal,
-    settingsButton, settingsSaveBtn, hubDescriptionInput, cloakTitleInput,
-    cloakFaviconInput, saveCloakSettingsBtn, panicButton;
-
-// Helper to find elements
-const $ = document.getElementById.bind(document);
 
 // --- LOCALSTORAGE HELPER FUNCTIONS ---
 
+/**
+ * Gets and parses data from localStorage.
+ * @param {string} key The key to retrieve.
+ * @param {*} defaultValue The default value if key doesn't exist or parsing fails.
+ * @returns {*} The parsed data or the default value.
+ */
 function getStorageData(key, defaultValue) {
     const raw = localStorage.getItem(key);
     if (!raw) return defaultValue;
@@ -55,498 +41,672 @@ function getStorageData(key, defaultValue) {
     }
 }
 
-function setStorageData(key, data) {
+/**
+ * Saves data to localStorage as a JSON string.
+ * @param {string} key The key to save under.
+ * @param {*} value The data to save.
+ */
+function setStorageData(key, value) {
     try {
-        localStorage.setItem(key, JSON.stringify(data));
+        localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-        console.error(`Failed to save to localStorage key "${key}":`, e);
+        console.error(`Failed to set localStorage key "${key}":`, e);
+    }
+}
+
+// --- DOM UTILITY ---
+const $ = (id) => document.getElementById(id);
+
+// --- DEFAULT GAME DATA ---
+const defaultGames = {
+    'g_subway_surfers': {
+        title: 'Subway Surfers',
+        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/subway-surfers.html',
+        image: 'https://placehold.co/400x300/f87171/ffffff?text=Subway+Surfers',
+        description: 'Run and dodge trains in this endless runner classic!',
+        section: 'featured',
+        tags: ['runner', 'mobile', 'action'],
+        created: '2024-10-20T10:00:00.000Z'
+    },
+    'g_slope': {
+        title: 'Slope',
+        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/slope.html',
+        image: 'https://placehold.co/400x300/4f46e5/ffffff?text=Slope',
+        description: 'Guide a ball down a steep slope, avoid obstacles, and set a high score.',
+        section: 'recommended',
+        tags: ['3d', 'skill', 'endless'],
+        created: '2024-10-25T10:00:00.000Z'
+    },
+    'g_tunnel_rush': {
+        title: 'Tunnel Rush',
+        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/tunnel-rush.html',
+        image: 'https://placehold.co/400x300/10b981/ffffff?text=Tunnel+Rush',
+        description: 'Race through a psychedelic tunnel, dodging geometric obstacles.',
+        section: 'recommended',
+        tags: ['3d', 'skill', 'fast-paced'],
+        created: '2024-11-01T10:00:00.000Z'
+    },
+    // Game added from user's snippet
+    'g_penalty_kicks': {
+        title: 'Penalty Kicks (Flash)',
+        url: 'https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@ae2e3923116cf101ff4d6ddbeec12df3dc78f133/penalty-kicks.swf',
+        image: 'https://placehold.co/400x300/1e40af/ffffff?text=Penalty+Kicks',
+        description: 'Test your nerve and accuracy in this classic soccer penalty shootout game. Requires Ruffle (Flash player emulator).',
+        section: 'sports',
+        tags: ['sports', 'soccer', 'flash'],
+        created: '2024-11-18T10:00:00.000Z'
+    },
+};
+
+// --- CONSTANTS ---
+const AVATARS = ['🎮', '👾', '🚀', '🤖', '🐱', '🐶', '🍕', '⚽', '👑', '🧙'];
+const ACCENT_COLORS = {
+    'Blue': { hex: '#3b82f6', rgb: '59, 130, 246' }, // blue-500
+    'Green': { hex: '#10b981', rgb: '16, 185, 129' }, // emerald-500
+    'Purple': { hex: '#8b5cf6', rgb: '139, 92, 246' }, // violet-500
+    'Red': { hex: '#ef4444', rgb: '239, 68, 68' }, // red-500
+};
+
+// --- INIT AND SETUP ---
+
+/**
+ * Initializes the application state by loading from localStorage.
+ */
+function initialize() {
+    // Load all state variables from localStorage, providing defaults
+    allGames = getStorageData('hubGames', defaultGames);
+    settings = getStorageData('hubSettings', { 
+        theme: 'light', 
+        accent: 'Blue', 
+        cloakTitle: 'Google Docs', 
+        cloakFavicon: '📄' 
+    });
+    stats = getStorageData('hubStats', stats);
+    hubUser = getStorageData('hubUser', hubUser);
+    myFavorites = getStorageData('myFavorites', myFavorites);
+    myGameNotes = getStorageData('myGameNotes', myGameNotes);
+    myGameRatings = getStorageData('myGameRatings', myGameRatings);
+    
+    // Initialize stats collections if they don't exist (safety)
+    stats.counts = stats.counts || {};
+    stats.recent = stats.recent || [];
+    stats.ratings = stats.ratings || { like: {}, dislike: {} };
+
+    // Apply initial settings
+    currentTheme = settings.theme;
+    updateTheme(currentTheme, false); // Apply theme without saving
+    updateAccentColor(settings.accent, false); // Apply accent without saving
+
+    // Set up tags from all games
+    const allTags = new Set();
+    Object.values(allGames).forEach(game => {
+        (game.tags || []).forEach(tag => allTags.add(tag));
+    });
+    currentTags = Array.from(allTags).sort();
+
+    // Load recent games locally for accurate count
+    localRecent = getStorageData('localRecent', []);
+
+    // Set initial search/sort state
+    currentSearchQuery = '';
+    currentGameSort = 'name';
+
+    // Initial render
+    renderAll();
+}
+
+/**
+ * Updates the theme globally and saves the setting.
+ * @param {'light'|'dark'} theme 
+ * @param {boolean} save Whether to save to settings (default true)
+ */
+function updateTheme(theme, save = true) {
+    currentTheme = theme;
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+
+    if (save) {
+        settings.theme = theme;
+        setStorageData('hubSettings', settings);
+    }
+}
+
+/**
+ * Updates the CSS variables for the accent color.
+ * @param {string} colorName 
+ * @param {boolean} save Whether to save to settings (default true)
+ */
+function updateAccentColor(colorName, save = true) {
+    const color = ACCENT_COLORS[colorName];
+    if (!color) return;
+
+    document.documentElement.style.setProperty('--accent-color', color.hex);
+    document.documentElement.style.setProperty('--accent-color-rgb', color.rgb);
+
+    if (save) {
+        settings.accent = colorName;
+        setStorageData('hubSettings', settings);
+    }
+}
+
+// --- RENDERING FUNCTIONS ---
+
+/**
+ * Renders the entire application content based on the current view.
+ */
+function renderAll() {
+    renderNavigation();
+    renderTagFilters();
+    renderPageContent();
+    lucide.createIcons();
+}
+
+/**
+ * Renders the nickname and avatar in the header.
+ */
+function renderNavigation() {
+    const profileBtn = $('profileBtn');
+    if (profileBtn) {
+        profileBtn.innerHTML = `<span class="text-xl">${hubUser.avatar}</span>`;
+    }
+}
+
+/**
+ * Renders the filterable tags above the game list.
+ */
+function renderTagFilters() {
+    const tagFiltersEl = $('tagFilters');
+    if (!tagFiltersEl) return;
+    
+    // The "All" button
+    const isAllActive = currentTags.length === 0 || currentTags.every(tag => tag.active === false);
+    let html = `<button onclick="clearTagFilters()" class="tag-button ${isAllActive ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}">All</button>`;
+    
+    // Other tag buttons
+    html += currentTags.map(tag => {
+        const isActive = tag.active;
+        return `<button onclick="toggleTagFilter('${tag.name}')" class="tag-button ${isActive ? 'bg-accent text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}">
+            ${tag.name}
+        </button>`;
+    }).join('');
+    
+    tagFiltersEl.innerHTML = html;
+}
+
+
+/**
+ * Renders all game sections and cards.
+ */
+function renderPageContent() {
+    const gameContentEl = $('gameContent');
+    if (!gameContentEl) return;
+    
+    const gamesArray = Object.keys(allGames).map(id => ({ ...allGames[id], id }));
+    const processedGames = processGames(gamesArray);
+    
+    // Group games by section
+    const sections = processedGames.reduce((acc, game) => {
+        const sectionName = game.section || 'other';
+        acc[sectionName] = acc[sectionName] || [];
+        acc[sectionName].push(game);
+        return acc;
+    }, {});
+
+    let html = '';
+    const sectionOrder = ['featured', 'recommended', 'sports', 'other'];
+
+    sectionOrder.forEach(sectionKey => {
+        const sectionGames = sections[sectionKey];
+        if (sectionGames && sectionGames.length > 0) {
+            const sectionTitle = sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1);
+            html += `
+                <section class="game-section" id="section-${sectionKey}">
+                    <h2 class="text-2xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">${sectionTitle}</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        ${sectionGames.map(game => renderGameCard(game.id)).join('')}
+                    </div>
+                </section>
+            `;
+        }
+    });
+
+    // Handle No Results
+    if (processedGames.length === 0 && currentSearchQuery) {
+        html = `
+            <div class="text-center py-12">
+                <i data-lucide="frown" class="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600"></i>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300">No Games Found</h3>
+                <p class="mt-2 text-gray-500 dark:text-gray-500">Try a different search query or clear your filters.</p>
+            </div>
+        `;
+    }
+
+    gameContentEl.innerHTML = html;
+}
+
+/**
+ * Renders a single game card HTML string.
+ * @param {string} gameId The ID of the game to render.
+ * @returns {string} The HTML string for the game card.
+ */
+function renderGameCard(gameId) {
+    const game = allGames[gameId];
+    if (!game) return '';
+
+    const isFav = myFavorites.includes(gameId);
+    const dateAdded = new Date(game.created);
+    const isNew = (new Date() - dateAdded) / (1000 * 60 * 60 * 24) < NEW_GAME_DAYS;
+
+    // Rating information
+    const userRating = myGameRatings[gameId];
+    // Calculate total likes/dislikes for this specific game (approximate for card view)
+    const likeCount = Object.keys(stats.ratings.like || {}).filter(id => id === gameId).length;
+    const dislikeCount = Object.keys(stats.ratings.dislike || {}).filter(id => id === gameId).length;
+    
+    const likeActive = userRating === 'like' ? 'text-accent fill-accent' : 'text-gray-400 dark:text-gray-500 hover:text-accent';
+    const dislikeActive = userRating === 'dislike' ? 'text-red-500 fill-red-500' : 'text-gray-400 dark:text-gray-500 hover:text-red-500';
+
+    // The entire card is clickable to open the modal
+    return `
+        <div id="game-card-${gameId}" data-game-id="${gameId}" class="game-card group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-700">
+            <div class="relative w-full h-48 overflow-hidden">
+                <img src="${game.image}" alt="${game.title}" class="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-80" onerror="this.onerror=null;this.src='https://placehold.co/400x300/4f46e5/ffffff?text=Image+Missing';">
+                ${isNew ? '<span class="absolute top-2 left-2 bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md z-10">NEW</span>' : ''}
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300"></div>
+                
+                <!-- Favorite Button Overlay -->
+                <button onclick="toggleFavorite('${gameId}'); event.stopPropagation();" class="absolute top-2 right-2 p-1.5 rounded-full bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm shadow-md hover:bg-white dark:hover:bg-gray-900 transition-colors z-20">
+                    <i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-300'}"></i>
+                </button>
+            </div>
+            
+            <div class="p-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate" title="${game.title}">${game.title}</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">${game.description}</p>
+                
+                <!-- Rating and Play Count -->
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <!-- Play Count -->
+                    <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                        <i data-lucide="play" class="w-4 h-4 mr-1"></i>
+                        <span>${stats.counts[gameId] || 0} Plays</span>
+                    </div>
+
+                    <!-- Rating Buttons (for quick card interaction) -->
+                    <div class="flex items-center space-x-3">
+                        <span class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <i data-lucide="thumbs-up" class="w-4 h-4 mr-0.5 ${likeActive}"></i>
+                            <span class="text-gray-600 dark:text-gray-300">${likeCount}</span>
+                        </span>
+                        <span class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <i data-lucide="thumbs-down" class="w-4 h-4 mr-0.5 ${dislikeActive}"></i>
+                            <span class="text-gray-600 dark:text-gray-300">${dislikeCount}</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// --- STATS AND INTERACTION LOGIC ---
+
+/**
+ * Increments the play count for a game and records it as recently played.
+ * @param {string} gameId 
+ */
+function updateGameStats(gameId) {
+    // 1. Update global play count
+    stats.counts[gameId] = (stats.counts[gameId] || 0) + 1;
+
+    // 2. Update global recent list (limit to 10)
+    stats.recent = stats.recent.filter(id => id !== gameId);
+    stats.recent.unshift(gameId);
+    stats.recent = stats.recent.slice(0, 10);
+
+    // 3. Update local recent list (for card rendering, limit to 5)
+    localRecent = localRecent.filter(id => id !== gameId);
+    localRecent.unshift(gameId);
+    localRecent = localRecent.slice(0, 5);
+    
+    // Save everything
+    setStorageData('hubStats', stats);
+    setStorageData('localRecent', localRecent);
+
+    // Update the UI if the modal is open
+    if (currentModalGameId === gameId) {
+        updateModalStatsUI(gameId);
+    }
+}
+
+/**
+ * Toggles the user's favorite status for a game.
+ * @param {string} gameId 
+ */
+function toggleFavorite(gameId) {
+    if (!allGames[gameId]) return;
+    const index = myFavorites.indexOf(gameId);
+    if (index > -1) {
+        myFavorites.splice(index, 1);
+        customAlert(`Removed ${allGames[gameId].title} from favorites.`, "Removed", "info");
+    } else {
+        myFavorites.push(gameId);
+        customAlert(`Added ${allGames[gameId].title} to favorites!`, "Favorited", "success");
+    }
+    setStorageData('myFavorites', myFavorites);
+    renderAll(); // Re-render to update the heart icon on the card
+    if (currentModalGameId === gameId) {
+        updateModalStatsUI(gameId); // Update the heart icon in the modal
+    }
+}
+
+/**
+ * Toggles the user's rating (like/dislike) for a specific game.
+ * @param {string} gameId The ID of the game.
+ * @param {'like'|'dislike'} type The rating type.
+ */
+function toggleGameRating(gameId, type) {
+    if (!allGames[gameId]) return;
+
+    const currentRating = myGameRatings[gameId];
+    const gameTitle = allGames[gameId].title;
+
+    // Initialize stats structure if needed
+    stats.ratings.like = stats.ratings.like || {};
+    stats.ratings.dislike = stats.ratings.dislike || {};
+
+    const newRating = type;
+
+    if (currentRating === newRating) {
+        // Toggling off the same rating
+        delete myGameRatings[gameId];
+        delete stats.ratings[currentRating][gameId];
+        customAlert(`Rating removed for ${gameTitle}.`, "Removed", "info");
+    } else {
+        // Remove old rating if it exists
+        if (currentRating) {
+            delete stats.ratings[currentRating][gameId];
+        }
+        
+        myGameRatings[gameId] = newRating; // Set new user rating
+        stats.ratings[newRating][gameId] = true; // Add to new type
+        customAlert(`Rated ${gameTitle} as ${newRating}!`, "Rated", "success");
+    }
+
+    setStorageData('hubStats', stats);
+    setStorageData('myGameRatings', myGameRatings);
+    
+    // Re-render all to update the card, and update modal if open
+    renderAll(); 
+    if (currentModalGameId === gameId) {
+        updateModalStatsUI(gameId); 
+    }
+}
+
+
+// --- GAME MODAL LOGIC ---
+
+/**
+ * **CRITICAL FIX LOCATION**
+ * Updates the modal UI elements (stats, favorite status, rating status) for the current game.
+ * @param {string} gameId 
+ */
+function updateModalStatsUI(gameId) {
+    const game = allGames[gameId];
+    if (!game) return;
+
+    // Element references. Added null checks below to prevent the reported TypeError.
+    const statsCountEl = $('modalStatsCount');
+    const favBtn = $('modalFavoriteBtn');
+    const likeBtn = $('modalLikeBtn');
+    const dislikeBtn = $('modalDislikeBtn');
+    const noteBtn = $('modalNoteBtn');
+    const noteArea = $('modalNoteArea'); // Also adding a check for this element
+
+    // --- CRITICAL NULL CHECK TO PREVENT CRASHES ---
+    if (!statsCountEl || !favBtn || !likeBtn || !dislikeBtn || !noteBtn || !noteArea) {
+        console.error("Game Modal UI elements are missing. Cannot update stats UI. (This is the fix for the reported TypeError.)");
+        return; 
+    }
+    // ---------------------------------------------
+    
+    const isFav = myFavorites.includes(gameId);
+    const userRating = myGameRatings[gameId];
+    const likeCount = Object.keys(stats.ratings.like || {}).filter(id => id === gameId).length;
+    const dislikeCount = Object.keys(stats.ratings.dislike || {}).filter(id => id === gameId).length;
+    const hasNote = !!myGameNotes[gameId];
+    
+    // 1. Update Play Count
+    statsCountEl.innerHTML = `<i data-lucide="play" class="w-4 h-4 mr-1"></i><span>${stats.counts[gameId] || 0}</span>`;
+
+    // 2. Update Favorite Button
+    favBtn.innerHTML = `<i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i>`;
+    favBtn.title = isFav ? 'Remove from Favorites' : 'Add to Favorites';
+
+    // 3. Update Like Button
+    likeBtn.innerHTML = `<i data-lucide="thumbs-up" class="w-5 h-5 ${userRating === 'like' ? 'fill-accent text-accent' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${likeCount}</span>`;
+    likeBtn.title = userRating === 'like' ? 'Remove Like' : 'Like Game';
+
+    // 4. Update Dislike Button
+    dislikeBtn.innerHTML = `<i data-lucide="thumbs-down" class="w-5 h-5 ${userRating === 'dislike' ? 'fill-red-500 text-red-500' : 'text-gray-500 dark:text-gray-400'}"></i><span class="ml-1 text-sm">${dislikeCount}</span>`;
+    dislikeBtn.title = userRating === 'dislike' ? 'Remove Dislike' : 'Dislike Game';
+
+    // 5. Update Note Button
+    if (hasNote) {
+        noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 fill-yellow-400 text-yellow-500"></i>`;
+        noteBtn.title = 'Edit Note (Saved)';
+    } else {
+        noteBtn.innerHTML = `<i data-lucide="sticky-note" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>`;
+        noteBtn.title = 'Add Note';
+        noteArea.classList.add('hidden'); // Hide note area by default if no note
+    }
+    
+    lucide.createIcons(); // Re-render icons after changing content
+}
+
+/**
+ * Opens the game modal and loads the game.
+ * @param {string} gameId 
+ */
+function openGameModal(gameId) {
+    const game = allGames[gameId];
+    if (!game) return;
+
+    currentModalGameId = gameId;
+
+    const modal = $('gameModal');
+    const titleEl = $('modalTitle');
+    const tagsEl = $('modalTags');
+    const descEl = $('modalDescription');
+    const iframe = $('modalGameIframe');
+    const noteTextarea = $('modalNoteText');
+    const noteArea = $('modalNoteArea');
+    
+    // 1. Populate modal content
+    titleEl.textContent = game.title;
+    descEl.textContent = game.description;
+    
+    tagsEl.innerHTML = (game.tags || []).map(tag => 
+        `<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">${tag}</span>`
+    ).join('');
+
+    // 2. Load game into iframe
+    const url = game.url;
+    
+    // For flash content, we load a wrapper HTML file that loads Ruffle.js
+    if (url.endsWith('.swf')) {
+        // This is a common pattern for loading SWF with Ruffle
+        const ruffleWrapper = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1f2937; overflow: hidden; }
+                    #ruffle-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+                </style>
+                <script src="https://cdn.jsdelivr.net/gh/u-cvlassrom-y/google@main/ruffle.js"></script>
+            </head>
+            <body>
+                <div id="ruffle-container">
+                    <object width="100%" height="100%">
+                        <param name="movie" value="${url}">
+                        <embed src="${url}" width="100%" height="100%">
+                    </object>
+                </div>
+                <script>
+                    window.RufflePlayer = window.RufflePlayer || {};
+                    window.RufflePlayer.config = {
+                        "autoplay": "on",
+                        "unmute-on-click": true,
+                        "base": "${url.substring(0, url.lastIndexOf('/') + 1)}",
+                        "allow-script-access": true,
+                        "quality": "high",
+                        "force-embedded-layout": true,
+                    };
+                    window.addEventListener("load", () => {
+                        const ruffle = window.RufflePlayer.newest();
+                        const player = ruffle.unmute().play();
+                        
+                        // Check if the game is embedded or an external SWF file
+                        const target = document.querySelector('embed') || document.querySelector('object');
+                        if(target) {
+                             const container = document.getElementById('ruffle-container');
+                             ruffle.load(target, {}).then((player) => {
+                                 player.style.width = '100%';
+                                 player.style.height = '100%';
+                                 container.innerHTML = '';
+                                 container.appendChild(player);
+                             });
+                        }
+                    });
+                </script>
+            </body>
+            </html>
+        `;
+        iframe.srcdoc = ruffleWrapper;
+    } else {
+        iframe.src = url;
+    }
+
+    // 3. Load note
+    noteTextarea.value = myGameNotes[gameId] || '';
+    if (myGameNotes[gameId]) {
+         noteArea.classList.remove('hidden');
+    } else {
+        noteArea.classList.add('hidden');
+    }
+    
+    // 4. Update stats and UI
+    updateGameStats(gameId); // Increments count and updates modal stats
+    updateModalStatsUI(gameId); 
+
+    // 5. Show modal
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.querySelector('.transform').classList.remove('scale-95');
+}
+
+/**
+ * Closes the game modal and stops the game.
+ */
+function closeGameModal() {
+    const modal = $('gameModal');
+    const iframe = $('modalGameIframe');
+    
+    // Stop the game by resetting iframe src
+    iframe.src = 'about:blank';
+    currentModalGameId = null;
+
+    // Hide modal
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    modal.querySelector('.transform').classList.add('scale-95');
+    
+    renderAll(); // Re-render to update the play count on the card
+}
+
+// --- CLOAKING (PANIC BUTTON) LOGIC ---
+
+/**
+ * Toggles the cloak state (panic mode).
+ */
+function toggleCloak() {
+    isCloaked = !isCloaked;
+    const favicon = $('favicon');
+    const appTitle = $('appTitle');
+    
+    if (isCloaked) {
+        document.title = settings.cloakTitle;
+        favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>${settings.cloakFavicon}</text></svg>`;
+        document.body.classList.add('cloaked-mode'); // Use a class for full page styling if needed
+        customAlert('Cloaked mode activated!', "Shhh!", "info");
+    } else {
+        document.title = "Unblocked Game Hub";
+        favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>`;
+        document.body.classList.remove('cloaked-mode');
+        customAlert('Cloaked mode deactivated.', "Welcome Back", "info");
     }
 }
 
 // --- UTILITIES ---
 
-function escapeHtml(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
+/**
+ * Custom alert function to display temporary messages.
+ * @param {string} message 
+ * @param {string} title 
+ * @param {'success'|'info'|'error'} type 
+ */
+function customAlert(message, title, type = 'success') {
+    const modal = $('customAlertModal');
+    const titleEl = $('alertTitle');
+    const messageEl = $('alertMessage');
+    const iconEl = $('alertIcon');
+    const alertBox = modal.querySelector('div[role="alert"]');
+    
+    if (!modal || !titleEl || !messageEl || !iconEl || !alertBox) {
+        console.warn('Alert modal elements not found.');
+        return;
+    }
 
-function escapeHtmlAttr(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
-// --- CUSTOM ALERT/CONFIRM ---
-
-function customAlert(message, title = "Info", type = "info") {
-    if (!alertModal) return;
-
-    let icon = '';
-    let bgColor = '';
-    let textColor = '';
+    let colorClass, iconName;
     
     switch (type) {
         case 'success':
-            icon = '<i data-lucide="check-circle" class="w-6 h-6"></i>';
-            bgColor = 'bg-green-600';
-            textColor = 'text-green-50';
+            colorClass = 'border-accent';
+            iconName = 'check-circle';
             break;
         case 'error':
-            icon = '<i data-lucide="x-octagon" class="w-6 h-6"></i>';
-            bgColor = 'bg-red-600';
-            textColor = 'text-red-50';
+            colorClass = 'border-red-500';
+            iconName = 'x-circle';
             break;
-        case 'warning':
-            icon = '<i data-lucide="alert-triangle" class="w-6 h-6"></i>';
-            bgColor = 'bg-yellow-600';
-            textColor = 'text-yellow-50';
-            break;
+        case 'info':
         default:
-            icon = '<i data-lucide="info" class="w-6 h-6"></i>';
-            bgColor = 'bg-accent';
-            textColor = 'text-white';
+            colorClass = 'border-blue-500';
+            iconName = 'info';
             break;
     }
 
-    const modalHTML = `
-        <div class="modal-content w-full max-w-sm p-4 ${bgColor} ${textColor} rounded-xl shadow-2xl animate-fade-in">
-            <div class="flex items-start">
-                <div class="mr-3">${icon}</div>
-                <div class="flex-grow">
-                    <h4 class="text-lg font-bold">${title}</h4>
-                    <p class="mt-1 text-sm">${message}</p>
-                </div>
-                <button class="modal-close-btn p-1 ml-4 rounded-full hover:bg-black hover:bg-opacity-10 transition duration-150">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            ${type === 'confirm' ? `
-                <div class="flex justify-end mt-4 space-x-2">
-                    <button class="confirm-yes-btn px-4 py-1 text-sm font-semibold bg-white text-gray-800 rounded-lg hover:bg-gray-100">Yes</button>
-                    <button class="confirm-no-btn px-4 py-1 text-sm font-semibold bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">No</button>
-                </div>
-            ` : ''}
-        </div>
-    `;
-    
-    const modalDiv = document.createElement('div');
-    modalDiv.innerHTML = modalHTML;
-    alertModal.appendChild(modalDiv);
-    alertModal.classList.remove('hidden');
-    lucide.createIcons();
+    // Reset classes
+    alertBox.className = alertBox.className.replace(/border-(accent|red|blue)-\d{3}/g, '');
+    alertBox.classList.add(colorClass);
 
-    const close = () => {
-        const content = modalDiv.querySelector('.modal-content');
-        if (content) {
-            content.classList.add('animate-fade-out');
-            content.addEventListener('animationend', () => {
-                modalDiv.remove();
-                if (alertModal.children.length === 0) {
-                    alertModal.classList.add('hidden');
-                }
-            }, { once: true });
-        } else {
-             modalDiv.remove();
-             if (alertModal.children.length === 0) {
-                    alertModal.classList.add('hidden');
-             }
-        }
-    };
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    iconEl.setAttribute('data-lucide', iconName);
+    lucide.createIcons(); // Update the icon
 
-    modalDiv.querySelector('.modal-close-btn')?.addEventListener('click', close);
+    // Show alert
+    modal.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
 
-    return new Promise((resolve) => {
-        if (type === 'confirm') {
-            modalDiv.querySelector('.confirm-yes-btn')?.addEventListener('click', () => { close(); resolve(true); });
-            modalDiv.querySelector('.confirm-no-btn')?.addEventListener('click', () => { close(); resolve(false); });
-        } else {
-            setTimeout(close, 3000);
-            resolve(true); // Resolve for non-confirm alerts
-        }
-    });
+    // Hide after 3 seconds
+    setTimeout(() => {
+        modal.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+    }, 3000);
 }
 
-// --- THEME FUNCTIONS ---
 
-function applyTheme(theme, isInitialLoad = false) {
-    if (theme === 'dark') {
-        doc.classList.add('dark');
-    } else {
-        doc.classList.remove('dark');
-    }
-    if (!isInitialLoad) {
-        updateThemeToggleUI(theme);
-    }
-}
-
-function updateThemeToggleUI(theme) {
-    const themeToUse = theme || currentTheme;
-    if (themeToggle) {
-        const icon = themeToggle.querySelector('i');
-        if (icon) {
-            if (themeToUse === 'dark') {
-                icon.setAttribute('data-lucide', 'moon');
-            } else {
-                icon.setAttribute('data-lucide', 'sun');
-            }
-            lucide.createIcons();
-        }
-    }
-}
-
-function toggleTheme() {
-    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-    setStorageData('currentTheme', currentTheme);
-    applyTheme(currentTheme, false);
-}
-
-// --- INITIALIZATION ---
-
-function initialize() {
-    // Load all data from localStorage
-    settings = getStorageData('hubSettings', {
-        hubDescription: 'Welcome! Use the Admin panel to set this description.',
-        accentColor: 'blue',
-        cloakTitle: 'Google Drive',
-        cloakFavicon: '📚'
-    });
-    allGames = getStorageData('hubGames', {});
-    stats = getStorageData('hubStats', { 
-        counts: {}, 
-        recent: [],
-        ratings: { likes: {}, dislikes: {} },
-        reports: {}
-    });
-    stats.ratings = stats.ratings || { likes: {}, dislikes: {} };
-    stats.reports = stats.reports || {};
-
-    myFavorites = getStorageData('myFavorites', []); 
-    myGameRatings = getStorageData('myGameRatings', {});
-    hubUser = getStorageData('hubUser', { nickname: 'Player', avatar: '🎮' });
-    
-    loadLocalRecent();
-
-    // Load and apply theme
-    currentTheme = getStorageData('currentTheme', 'light');
-    applyTheme(currentTheme, true);
-    updateThemeToggleUI(); // Set the icon correctly on load
-
-    // *** THIS IS THE FIX: Changed 'renderUserProfile' to 'updateUserProfileUI' ***
-    updateUserProfileUI();
-
-    // Update "auth" status
-    authMessage.textContent = `Local Storage`;
-    authStatus.classList.remove('bg-gray-100', 'dark:bg-gray-700');
-    authStatus.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-300');
-
-    applySettings();
-    renderAll();
-    
-    loadingModal.style.display = 'none';
-    console.log("App initialized successfully.");
-}
-
-// --- RENDER FUNCTIONS ---
-
-function renderAll() {
-    renderNavigation();
-    renderFeaturedGame();
-    renderGameSections();
-    renderFavoritesPage(); 
-    renderTagsPage();
-    renderAdminList();
-    renderRecentlyPlayed();
-    lucide.createIcons();
-}
-
-function applySettings() {
-    homeDesc.textContent = settings.hubDescription || 'Loading...';
-    hubDescriptionInput.value = settings.hubDescription || '';
-    
-    cloakTitleInput.value = settings.cloakTitle || 'Google Drive';
-    cloakFaviconInput.value = settings.cloakFavicon || '📚';
-    
-    applyThemeColor(settings.accentColor || 'blue');
-}
-
-function applyThemeColor(color) {
-    // Helper function to apply color variables
-    const colorMap = {
-        'blue': { hex: '#3b82f6', rgb: '59, 130, 246' },
-        'green': { hex: '#22c55e', rgb: '34, 197, 94' },
-        'red': { hex: '#ef4444', rgb: '239, 68, 68' },
-        'indigo': { hex: '#6366f1', rgb: '99, 102, 241' },
-    };
-    const theme = colorMap[color] || colorMap['blue'];
-    doc.style.setProperty('--accent-color', theme.hex);
-    doc.style.setProperty('--accent-color-rgb', theme.rgb);
-}
-
-function renderNavigation() {
-    if (!desktopNav || !mobileNav) return;
-
-    const navItems = [
-        { id: 'home', name: 'Home', icon: 'home' },
-        { id: 'favorites', name: 'Favorites', icon: 'heart' },
-        { id: 'tags', name: 'Tags', icon: 'tag' },
-        { id: 'admin', name: 'Admin', icon: 'lock' } // ALWAYS show the admin link
-    ];
-
-    desktopNav.innerHTML = '';
-    const mobileNavContainer = mobileNav.querySelector('.flex-col');
-    if (mobileNavContainer) mobileNavContainer.innerHTML = '';
-
-    const currentSection = document.querySelector('.page:not([style*="display:none"])')?.id.replace('page-', '') || 'home';
-
-    navItems.forEach(item => {
-        const isActive = item.id === currentSection;
-        const buttonClass = `flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 page-link ${
-            isActive
-                ? 'bg-accent text-white shadow-md hover:bg-opacity-90'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-        }`;
-        
-        const btnHTML = `<i data-lucide="${item.icon}" class="w-5 h-5"></i><span>${item.name}</span>`;
-        
-        const deskBtn = document.createElement('button');
-        deskBtn.className = buttonClass;
-        deskBtn.dataset.page = item.id;
-        deskBtn.innerHTML = btnHTML;
-        desktopNav.appendChild(deskBtn);
-
-        const mobileBtn = document.createElement('button');
-        mobileBtn.className = buttonClass + ' w-full justify-start';
-        mobileBtn.dataset.page = item.id;
-        mobileBtn.innerHTML = btnHTML;
-        if (mobileNavContainer) mobileNavContainer.appendChild(mobileBtn);
-    });
-
-    lucide.createIcons();
-}
-
-function switchPage(pageId) {
-    pages.forEach(page => page.style.display = 'none');
-    
-    const targetPage = $(`page-${pageId}`);
-    if (targetPage) {
-        targetPage.style.display = 'block';
-    } else {
-        pageHome.style.display = 'block';
-    }
-    
-    renderNavigation();
-    
-    if (mobileNav) mobileNav.classList.add('hidden');
-    
-    if (pageId === 'favorites') renderFavoritesPage();
-    else if (pageId === 'tags') renderTagsPage();
-    else if (pageId === 'admin') {
-        const isAdmin = getStorageData('isAdmin', false);
-        if (adminLogin) adminLogin.classList.toggle('hidden', isAdmin);
-        if (adminTools) adminTools.classList.toggle('hidden', !isAdmin);
-        if (isAdmin) renderAdminList();
-    }
-}
-
-function renderGameCard(gameId, isFeatured = false) {
-    const game = allGames[gameId];
-    if (!game) return '';
-
-    const isFav = myFavorites.includes(gameId);
-    const userRating = myGameRatings[gameId];
-    const isLiked = userRating === 'like';
-    const isDisliked = userRating === 'dislike';
-    
-    const gameCreatedDate = new Date(game.created || '2000-01-01');
-    const isNew = (new Date() - gameCreatedDate) / (1000 * 60 * 60 * 24) < NEW_GAME_DAYS;
-
-    const likeCount = stats.ratings.likes[gameId] || 0;
-    const dislikeCount = stats.ratings.dislikes[gameId] || 0;
-
-    const sizeClasses = isFeatured 
-        ? 'col-span-1 md:col-span-3 lg:col-span-5 flex-col md:flex-row' 
-        : 'flex-col';
-    const bgClasses = isFeatured 
-        ? 'bg-gradient-to-br from-accent/10 to-transparent dark:from-accent/20' 
-        : 'bg-white dark:bg-gray-800 hover:shadow-xl';
-    
-    const imagePlaceholder = escapeHtml(game.title.substring(0, 1).toUpperCase());
-    const tags = (game.tags || '').split(',').filter(t => t.trim());
-
-    return `
-        <div data-game-id="${gameId}" class="game-card flex ${sizeClasses} p-4 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg transition-all duration-300 cursor-pointer ${bgClasses}">
-            <div class="relative flex items-center justify-center ${isFeatured ? 'w-full h-40 md:w-60 md:h-full' : 'w-full h-40'} flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
-                <span class="text-6xl font-extrabold text-gray-500 dark:text-gray-400 opacity-70">
-                    ${imagePlaceholder}
-                </span>
-                ${isNew ? '<span class="absolute top-2 right-2 px-2 py-1 text-xs font-bold text-white bg-green-500 rounded-full">NEW</span>' : ''}
-            </div>
-            
-            <div class="flex flex-col ${isFeatured ? 'p-4 md:p-6 md:ml-6' : 'mt-4 w-full'}">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xl font-bold truncate ${isFeatured ? 'text-accent' : ''}">${escapeHtml(game.title)}</h3>
-                    <button class="favorite-toggle-btn p-1 text-yellow-500 hover:text-yellow-400" data-game-id="${gameId}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">
-                        <i data-lucide="${isFav ? 'star' : 'star'}" class="w-5 h-5 ${isFav ? 'fill-yellow-500' : ''}"></i>
-                    </button>
-                </div>
-                
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400 ${isFeatured ? 'line-clamp-4' : 'line-clamp-2'}">${escapeHtml(game.description || 'No description provided.')}</p>
-                
-                <div class="flex flex-wrap gap-2 mt-3">
-                    ${tags.map(tag => `
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 tag-filter-btn cursor-pointer" data-tag="${escapeHtmlAttr(tag.trim())}">${escapeHtml(tag.trim())}</span>
-                    `).join('')}
-                </div>
-
-                <div class="flex items-center justify-between mt-4 border-t border-gray-100 dark:border-gray-700 pt-3 text-xs text-gray-500 dark:text-gray-400">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex items-center text-green-500">
-                            <i data-lucide="thumbs-up" class="w-4 h-4 mr-1 ${isLiked ? 'fill-green-500' : ''}"></i>
-                            <span class="font-bold">${likeCount}</span>
-                        </div>
-                        <div class="flex items-center text-red-500">
-                            <i data-lucide="thumbs-down" class="w-4 h-4 mr-1 ${isDisliked ? 'fill-red-500' : ''}"></i>
-                            <span class="font-bold">${dislikeCount}</span>
-                        </div>
-                    </div>
-                    <span>Section: ${escapeHtml(game.section.toUpperCase())}</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderGameSections() {
-    if (!gameSectionsContainer) return;
-    gameSectionsContainer.innerHTML = '';
-    const sections = {};
-    Object.values(allGames).forEach(game => {
-        if (!sections[game.section]) sections[game.section] = [];
-        sections[game.section].push(game);
-    });
-
-    const sectionTitles = {
-        'popular': '🔥 Popular Picks',
-        'new': '✨ New Games',
-        'action': '💥 Action & Adventure',
-        'puzzle': '🧩 Puzzle & Logic',
-    };
-
-    Object.keys(sectionTitles).forEach(sectionKey => {
-        const games = sections[sectionKey] || [];
-        if (games.length > 0) {
-            
-            // Filter and Sort Games (NEW)
-            const processedGames = processGames(games);
-
-            const sectionHTML = `
-                <section id="section-${sectionKey}" class="mt-8">
-                    <h2 class="text-3xl font-bold text-gray-900 dark:text-white">${sectionTitles[sectionKey]}</h2>
-                    <div class="grid grid-cols-1 gap-6 mt-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                        ${processedGames.map(game => renderGameCard(game.id)).join('')}
-                    </div>
-                </section>
-            `;
-            gameSectionsContainer.innerHTML += sectionHTML;
-        }
-    });
-}
-
-function renderFeaturedGame() {
-    if (!featuredGameContainer) return;
-    const sortedGames = Object.values(allGames).sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-    if (sortedGames.length > 0) {
-        featuredGameContainer.innerHTML = `
-            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Featured Game of the Week</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                ${renderGameCard(sortedGames[0].id, true)}
-            </div>
-        `;
-    } else {
-        featuredGameContainer.innerHTML = '';
-    }
-}
-
-function renderRecentlyPlayed() {
-    if (!recentlyPlayedGrid) return;
-    const recentGames = localRecent.filter(id => allGames[id]).slice(0, 5);
-    if (recentGames.length === 0) {
-        recentlyPlayedGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">No games played recently. Start playing!</p>';
-        return;
-    }
-    recentlyPlayedGrid.innerHTML = recentGames.map(id => renderGameCard(id)).join('');
-}
-
-function renderFavoritesPage() {
-    if (!favoritesGrid) return;
-    
-    const favoriteGameObjects = myFavorites.map(id => allGames[id]).filter(Boolean);
-    
-    // Filter and Sort Games (NEW)
-    const processedGames = processGames(favoriteGameObjects);
-
-    if (processedGames.length === 0) {
-        if (currentSearchQuery) {
-            favoritesGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">No favorites match your search.</p>';
-        } else {
-            favoritesGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 col-span-5">You haven\'t added any favorites yet. Click the ⭐ on a game card to save it here!</p>';
-        }
-        return;
-    }
-    favoritesGrid.innerHTML = processedGames.map(game => renderGameCard(game.id)).join('');
-}
-
-function renderTagsPage() {
-    if (!tagsPageGrid) return;
-    const uniqueTags = new Set();
-    Object.values(allGames).forEach(game => {
-        (game.tags || '').split(',').forEach(tag => {
-            const trimmedTag = tag.trim();
-            if (trimmedTag) uniqueTags.add(trimmedTag);
-        });
-    });
-    if (uniqueTags.size === 0) {
-        tagsPageGrid.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No tags found.</p>';
-        return;
-    }
-    tagsPageGrid.innerHTML = Array.from(uniqueTags).sort().map(tag => `
-        <button class="px-3 py-1 text-sm font-medium rounded-full bg-accent/20 text-accent dark:bg-accent/40 dark:text-white hover:bg-accent hover:text-white transition-colors duration-150 tag-filter-btn" data-tag="${escapeHtmlAttr(tag)}">
-            #${escapeHtml(tag)}
-        </button>
-    `).join('');
-}
-
-function renderAdminList() {
-    if (!existingGamesList) return;
-    const gamesArray = Object.values(allGames).sort((a, b) => a.title.localeCompare(b.title));
-    if (gamesArray.length === 0) {
-        existingGamesList.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No games currently in the hub.</p>';
-        return;
-    }
-    existingGamesList.innerHTML = gamesArray.map(game => `
-        <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700">
-            <span class="text-sm font-medium truncate">${escapeHtml(game.title)}</span>
-            <div class="flex space-x-2">
-                <button data-game-id="${game.id}" class="admin-edit-btn p-1 text-blue-500 hover:text-blue-400" title="Edit Game">
-                    <i data-lucide="pencil" class="w-4 h-4"></i>
-                </button>
-                <button data-game-id="${game.id}" class="admin-delete-btn p-1 text-red-500 hover:text-red-400" title="Delete Game">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-    lucide.createIcons();
-}
-
-// --- NEW HELPER FUNCTION FOR SORTING/FILTERING ---
+// --- FILTERING AND SORTING ---
 
 /**
  * Filters and sorts an array of game objects based on global state.
@@ -556,14 +716,25 @@ function renderAdminList() {
 function processGames(games) {
     let processed = games;
 
-    // 1. Filter by Search Query
-    if (currentSearchQuery) {
+    // 1. Filter by Active Tags
+    const activeTags = currentTags.filter(tag => tag.active).map(tag => tag.name);
+    if (activeTags.length > 0) {
         processed = processed.filter(game => 
-            game.title.toLowerCase().includes(currentSearchQuery.toLowerCase())
+            activeTags.every(activeTag => (game.tags || []).includes(activeTag))
+        );
+    }
+    
+    // 2. Filter by Search Query
+    if (currentSearchQuery) {
+        const query = currentSearchQuery.toLowerCase();
+        processed = processed.filter(game => 
+            game.title.toLowerCase().includes(query) || 
+            (game.description || '').toLowerCase().includes(query) ||
+            (game.tags || []).some(tag => tag.toLowerCase().includes(query))
         );
     }
 
-    // 2. Sort
+    // 3. Sort
     switch (currentGameSort) {
         case 'newest':
             processed.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
@@ -580,550 +751,450 @@ function processGames(games) {
     return processed;
 }
 
-
-// --- GAME MODAL LOGIC ---
-
-function updateGameStats(gameId, type) {
-    if (!allGames[gameId]) return;
-
-    const currentRating = myGameRatings[gameId];
-    let newRating = null;
-
-    if (type === 'like') {
-        newRating = currentRating === 'like' ? null : 'like';
-    } else if (type === 'dislike') {
-        newRating = currentRating === 'dislike' ? null : 'dislike';
+/**
+ * Toggles a single tag filter.
+ * @param {string} tagName 
+ */
+function toggleTagFilter(tagName) {
+    const tag = currentTags.find(t => t.name === tagName);
+    if (tag) {
+        tag.active = !tag.active;
     }
-
-    if (currentRating === 'like') {
-        stats.ratings.likes[gameId] = (stats.ratings.likes[gameId] || 1) - 1;
-    } else if (currentRating === 'dislike') {
-        stats.ratings.dislikes[gameId] = (stats.ratings.dislikes[gameId] || 1) - 1;
-    }
-
-    if (newRating === 'like') {
-        stats.ratings.likes[gameId] = (stats.ratings.likes[gameId] || 0) + 1;
-    } else if (newRating === 'dislike') {
-        stats.ratings.dislikes[gameId] = (stats.ratings.dislikes[gameId] || 0) + 1;
-    }
-
-    if (newRating) {
-        myGameRatings[gameId] = newRating;
-    } else {
-        delete myGameRatings[gameId];
-    }
-    
-    setStorageData('myGameRatings', myGameRatings);
-    setStorageData('hubStats', stats);
-    
-    updateModalStatsUI(gameId);
     renderAll();
 }
 
-function updateModalStatsUI(gameId) {
-    if (!gameId) return;
-    
-    likeCountSpan.textContent = stats.ratings.likes[gameId] || 0;
-    dislikeCountSpan.textContent = stats.ratings.dislikes[gameId] || 0;
-
-    const userRating = myGameRatings[gameId];
-    const isFav = myFavorites.includes(gameId);
-
-    modalLikeBtn.querySelector('i').classList.toggle('fill-green-500', userRating === 'like');
-    modalDislikeBtn.querySelector('i').classList.toggle('fill-red-500', userRating === 'dislike');
-    modalFavoriteBtn.querySelector('i').classList.toggle('fill-yellow-500', isFav);
-}
-
-function extractGameIdFromIframe() {
-    if (gameIframe && gameIframe.dataset.gameId) {
-        return gameIframe.dataset.gameId;
-    }
-    return null;
-}
-
-function openGameModal(gameId) {
-    const game = allGames[gameId];
-    if (!game || !gameModal || !modalGameTitle || !gameIframe) return;
-
-    currentGameUrl = game.url;
-    modalGameTitle.textContent = game.title;
-    gameIframe.src = game.url;
-    gameIframe.dataset.gameId = gameId;
-    gameModal.classList.remove('hidden');
-
-    updateModalStatsUI(gameId);
-    
-    localRecent = localRecent.filter(id => id !== gameId);
-    localRecent.unshift(gameId);
-    setStorageData('localRecent', localRecent);
-    
-    renderRecentlyPlayed();
-}
-
-function closeGameModal() {
-    if (!gameModal || !gameIframe) return;
-    gameModal.classList.add('hidden');
-    gameIframe.src = '';
-    gameIframe.dataset.gameId = '';
-    currentGameUrl = null;
-}
-
-// --- HELPER FUNCTIONS ---
-
-function loadLocalRecent() {
-    localRecent = getStorageData('localRecent', []);
-}
-
-function toggleFavorite(gameId) {
-    if (!gameId) return;
-    const index = myFavorites.indexOf(gameId);
-    if (index > -1) {
-        myFavorites.splice(index, 1);
-        customAlert('Removed from Favorites!', 'Removed', 'info');
-    } else {
-        myFavorites.push(gameId);
-        customAlert('Added to Favorites!', 'Favorite', 'success');
-    }
-    setStorageData('myFavorites', myFavorites);
-    
-    updateModalStatsUI(gameId);
+/**
+ * Clears all active tag filters.
+ */
+function clearTagFilters() {
+    currentTags.forEach(tag => tag.active = false);
     renderAll();
 }
 
-function handleAdminLogin() {
-    if (adminPasswordInput.value === ADMIN_PASS) {
-        setStorageData('isAdmin', true);
-        adminLogin.classList.add('hidden');
-        adminTools.classList.remove('hidden');
-        customAlert('Admin access granted!', 'Success', 'success');
-        renderNavigation();
-        renderAdminList();
-    } else {
-        customAlert('Incorrect password.', 'Denied', 'error');
-    }
-}
 
+// --- ADMIN & DATA MANAGEMENT ---
+
+/**
+ * Clears the add/edit game form.
+ */
 function clearAddForm() {
-    gameIdInput.value = '';
-    gameTitleInput.value = '';
-    gameUrlInput.value = '';
-    gameDescriptionInput.value = '';
-    gameTagsInput.value = '';
-    gameSectionInput.value = 'popular';
-    gameIdInput.classList.add('bg-gray-100');
-    gameIdInput.readOnly = true;
+    $('addGameForm').reset();
+    $('gameIdInput').value = '';
+    $('saveGameBtn').textContent = 'Add Game';
+    $('saveGameBtn').classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+    $('saveGameBtn').classList.add('bg-accent', 'hover:opacity-90');
+    customAlert('Form cleared.', "Ready", "info");
 }
 
-async function saveGame() {
-    const id = gameIdInput.value;
-    const title = gameTitleInput.value.trim();
-    const url = gameUrlInput.value.trim();
-    const description = gameDescriptionInput.value.trim();
-    const tags = gameTagsInput.value.trim();
-    const section = gameSectionInput.value;
-
-    if (!title || !url || !section) {
-        customAlert("Title, URL, and Section are required.", "Error", "error");
-        return;
-    }
-
-    const gameData = { title, url, description, tags, section, created: new Date().toISOString() };
-    
-    if (id) {
-        allGames[id] = { ...allGames[id], ...gameData, created: allGames[id].created };
-        customAlert(`Game "${title}" updated!`, "Success", "success");
-    } else {
-        const newId = `g_${new Date().getTime()}`;
-        allGames[newId] = { id: newId, ...gameData };
-        customAlert(`Game "${title}" added!`, "Success", "success");
-    }
-    
-    setStorageData('hubGames', allGames);
-    renderAll();
-    clearAddForm();
-}
-
-function editGame(gameId) {
-    const game = allGames[gameId];
-    if (!game) return;
-    
-    gameIdInput.value = game.id;
-    gameTitleInput.value = game.title;
-    gameUrlInput.value = game.url;
-    gameDescriptionInput.value = game.description || '';
-    gameTagsInput.value = game.tags || '';
-    gameSectionInput.value = game.section;
-
-    gameIdInput.readOnly = false;
-    gameIdInput.classList.remove('bg-gray-100');
-    switchPage('admin');
-    gameTitleInput.focus();
-}
-
-async function deleteGame(gameId) {
-    if (!gameId || !allGames[gameId]) return;
-
-    const confirmed = await customAlert(`Are you sure you want to delete "${allGames[gameId].title}"?`, "Confirm Deletion", "confirm");
-    
-    if (confirmed) {
-        delete allGames[gameId];
-        setStorageData('hubGames', allGames);
-        
-        delete stats.counts[gameId];
-        delete stats.ratings.likes[gameId];
-        delete stats.ratings.dislikes[gameId];
-        setStorageData('hubStats', stats);
-        
-        myFavorites = myFavorites.filter(id => id !== gameId);
-        setStorageData('myFavorites', myFavorites);
-        delete myGameRatings[gameId];
-        setStorageData('myGameRatings', myGameRatings);
-
-        customAlert('Game deleted successfully!', 'Success', 'success');
-        renderAll();
-    }
-}
-
+/**
+ * Exports all application data as a JSON file.
+ */
 function exportData() {
-    const dataToExport = {
-        hubGames: allGames,
-        hubSettings: settings,
-        hubStats: stats
+    const exportData = {
+        games: allGames,
+        settings: settings,
+        stats: stats,
+        user: hubUser,
+        favorites: myFavorites,
+        notes: myGameNotes,
+        ratings: myGameRatings
     };
-    const jsonString = JSON.stringify(dataToExport, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
+    
     const a = document.createElement('a');
     a.href = url;
-    a.download = `unblocked_hub_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `GameHub_Data_Export_${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    customAlert('Data export started!', 'Exporting', 'info');
-}
-
-async function importData(file) {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            let gameCount = 0;
-
-            if (data.hubGames) {
-                allGames = { ...allGames, ...data.hubGames };
-                setStorageData('hubGames', allGames);
-                gameCount = Object.keys(data.hubGames).length;
-            }
-            if (data.hubSettings) {
-                settings = { ...settings, ...data.hubSettings };
-                setStorageData('hubSettings', settings);
-                applySettings();
-            }
-            if (data.hubStats) {
-                stats = { ...stats, ...data.hubStats };
-                setStorageData('hubStats', stats);
-            }
-
-            customAlert(`Import successful! ${gameCount} games processed.`, "Success", "success");
-            renderAll();
-
-        } catch (err) {
-            console.error("Error during data import:", err);
-            customAlert(`Failed to import data: ${err.message}`, "Error", "error");
-        }
-    };
-    reader.readAsText(file);
-}
-
-function handlePanic() {
-    const newTitle = settings.cloakTitle || 'Google Drive';
-    const newFavicon = settings.cloakFavicon || '📚';
-    
-    if (!isCloaked) {
-        document.title = newTitle;
-        favicon.href = newFavicon;
-        appWrapper.style.display = 'none';
-        isCloaked = true;
-    } else {
-        document.title = 'Unblocked Game Hub';
-        favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>';
-        appWrapper.style.display = 'flex';
-        isCloaked = false;
-    }
-}
-
-function saveCloakSettings() {
-    settings.cloakTitle = cloakTitleInput.value.trim();
-    settings.cloakFavicon = cloakFaviconInput.value.trim();
-    setStorageData('hubSettings', settings);
-    customAlert('Cloak settings saved!', 'Settings Updated', 'success');
-}
-
-function updateUserProfileUI() {
-    userProfileAvatar.textContent = hubUser.avatar;
-    userProfileName.textContent = hubUser.nickname;
-}
-
-function openUserProfileModal() {
-    userNicknameInput.value = hubUser.nickname;
-    userProfileModal.classList.remove('hidden');
-    renderAvatarGrid();
-}
-
-function renderAvatarGrid() {
-    if (!userAvatarGrid) return;
-    const avatars = ['🎮', '🚀', '⭐', '👽', '👾', '🤖', '👑', '🐱', '🐶', '🍕', '⚽', '🏀', '🎸', '📚', '🧪', '💡'];
-    
-    let tempAvatar = hubUser.avatar;
-
-    userAvatarGrid.innerHTML = avatars.map(av => `
-        <button class="avatar-btn ${hubUser.avatar === av ? 'avatar-selected' : ''}" data-avatar="${escapeHtmlAttr(av)}">
-            ${escapeHtml(av)}
-        </button>
-    `).join('');
-
-    userAvatarGrid.querySelectorAll('.avatar-btn').forEach(btn => {
-        btn.onclick = () => {
-            userAvatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('active-avatar')); // Use a unique class
-            btn.classList.add('active-avatar');
-            tempAvatar = btn.dataset.avatar;
-        };
-    });
-    
-    userProfileSaveBtn.onclick = () => saveUserProfile(tempAvatar);
-}
-
-function saveUserProfile(selectedAvatar) {
-    const newNickname = userNicknameInput.value.trim() || 'Player';
-    const newAvatar = selectedAvatar || hubUser.avatar;
-
-    hubUser = { nickname: newNickname, avatar: newAvatar };
-    setStorageData('hubUser', hubUser);
-    
-    updateUserProfileUI();
-    userProfileModal.classList.add('hidden');
-    customAlert('Profile saved!', 'Success', 'success');
+    customAlert('All data exported successfully!', "Export Complete", "success");
 }
 
 /**
- * This is the main execution block. It waits for the HTML to be fully loaded
- * before finding elements and attaching listeners.
+ * Imports data from a JSON file.
+ * @param {File} file 
  */
+function importData(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            
+            // Overwrite existing data with imported data
+            allGames = imported.games || allGames;
+            settings = imported.settings || settings;
+            stats = imported.stats || stats;
+            hubUser = imported.user || hubUser;
+            myFavorites = imported.favorites || myFavorites;
+            myGameNotes = imported.notes || myGameNotes;
+            myGameRatings = imported.ratings || myGameRatings;
+
+            // Save to localStorage
+            setStorageData('hubGames', allGames);
+            setStorageData('hubSettings', settings);
+            setStorageData('hubStats', stats);
+            setStorageData('hubUser', hubUser);
+            setStorageData('myFavorites', myFavorites);
+            setStorageData('myGameNotes', myGameNotes);
+            setStorageData('myGameRatings', myGameRatings);
+
+            // Re-init to update theme/accent and re-render
+            initialize(); 
+            customAlert('Data imported successfully! The hub has been reloaded.', "Import Complete", "success");
+        } catch (error) {
+            console.error("Error importing data:", error);
+            customAlert(`Error importing data: ${error.message}`, "Import Error", "error");
+        }
+    };
+    reader.onerror = () => {
+        customAlert('Failed to read file.', "Import Error", "error");
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be selected again
+    $('importFileInput').value = '';
+}
+
+
+// --- EVENT LISTENERS ---
+
 document.addEventListener('DOMContentLoaded', () => {
-
-    // --- DOM ELEMENT ASSIGNMENTS ---
-    // All element selections are now safely inside the listener
-    doc = document.documentElement;
-    appWrapper = $("appWrapper");
-    favicon = $("favicon");
-    desktopNav = $("desktopNav");
-    mobileNav = $("mobileNav");
-    mobileMenuButton = $("mobileMenuButton");
-    gameSectionsContainer = $("gameSectionsContainer");
-    authStatus = $("authStatus");
-    authMessage = $("authMessage");
-    themeToggle = $("themeToggle"); 
-    userProfileButton = $("userProfileButton");
-    userProfileAvatar = $("userProfileAvatar");
-    userProfileName = $("userProfileName");
-    loadingModal = $("loadingModal");
-    pages = document.querySelectorAll(".page");
-    pageHome = $("page-home");
-    homeDesc = $("homeDesc");
-    featuredGameContainer = $("featuredGameContainer");
-    recentlyPlayedGrid = $("recentlyPlayedGrid");
-    favoritesGrid = $("favoritesGrid");
-    pageFavorites = $("page-favorites");
-    pageTags = $("page-tags");
-    tagsPageGrid = $("tagsPageGrid");
-    adminPanel = $("page-admin");
-    adminLogin = $("adminLogin");
-    adminPasswordInput = $("adminPasswordInput");
-    adminLoginBtn = $("adminLoginBtn");
-    adminTools = $("adminTools");
-    gameForm = $("gameForm");
-    gameIdInput = $("gameIdInput");
-    gameTitleInput = $("gameTitleInput");
-    gameSectionInput = $("gameSectionInput");
-    gameDescriptionInput = $("gameDescriptionInput");
-    gameTagsInput = $("gameTagsInput");
-    gameUrlInput = $("gameUrlInput");
-    saveGameBtn = $("saveGameBtn");
-    clearFormBtn = $("clearFormBtn");
-    existingGamesList = $("existingGamesList");
-    exportDataBtn = $("exportDataBtn");
-    importDataBtn = $("importDataBtn");
-    importFileInput = $("importFileInput");
-    alertModal = $("customModalContainer");
-    gameModal = $("gameModal");
-    modalGameTitle = $("modalGameTitle");
-    gameIframe = $("gameIframe");
-    modalCloseBtn = $("modalCloseBtn");
-    modalNewWindowBtn = $("modalNewWindowBtn");
-    modalLikeBtn = $("modalLikeBtn");
-    modalDislikeBtn = $("modalDislikeBtn");
-    modalFavoriteBtn = $("modalFavoriteBtn");
-    likeCountSpan = $("likeCount");
-    dislikeCountSpan = $("dislikeCount");
-    userProfileModal = $("userProfileModal");
-    userNicknameInput = $("userNicknameInput");
-    userAvatarGrid = $("userAvatarGrid");
-    userProfileSaveBtn = $("userProfileSaveBtn");
-    userProfileCancelBtn = $("userProfileCancelBtn");
-    settingsModal = $("settingsModal");
-    settingsButton = $("settingsButton");
-    settingsSaveBtn = $("settingsSaveBtn");
-    hubDescriptionInput = $("hubDescriptionInput");
-    cloakTitleInput = $("cloakTitleInput");
-    cloakFaviconInput = $("cloakFaviconInput");
-    saveCloakSettingsBtn = $("saveCloakSettingsBtn");
-    panicButton = $("panicButton");
-
-    // --- NEW: Search and Sort Elements ---
-    const searchBar = $("searchBar");
-    const sortSelect = $("sortSelect");
-
-    // --- ATTACH EVENT LISTENERS ---
-    // Now that all functions are defined globally and elements are found,
-    // we can safely attach the listeners.
-
-    // General Navigation
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('.page-link');
-        if (link && link.dataset.page) {
-            switchPage(link.dataset.page);
-        }
-    });
-    
-    // Theme Toggle
-    if(themeToggle) themeToggle.onclick = toggleTheme;
-    
-    // Mobile Menu
-    if(mobileMenuButton) mobileMenuButton.onclick = () => mobileNav.classList.toggle('hidden');
-    if(mobileNav) mobileNav.onclick = (e) => {
-        if (e.target === mobileNav || e.target.closest('.page-link')) {
-            mobileNav.classList.add('hidden');
-        }
-    };
-
-    // --- NEW: Search and Sort Listeners ---
-    if(searchBar) {
-        searchBar.addEventListener('input', (e) => {
-            currentSearchQuery = e.target.value;
-            renderAll(); // Re-render all game lists
-        });
-    }
-
-    if(sortSelect) {
-        sortSelect.addEventListener('change', (e) => {
-            currentGameSort = e.target.value;
-            renderAll(); // Re-render all game lists
-        });
-    }
-
-    // Game Modal Listeners
-    if(modalCloseBtn) modalCloseBtn.onclick = closeGameModal;
-    if(modalNewWindowBtn) modalNewWindowBtn.onclick = () => {
-        if (currentGameUrl) window.open(currentGameUrl, '_blank');
-    };
-    if(gameModal) gameModal.onclick = (e) => {
-        if (e.target === gameModal) closeGameModal();
-    };
-    
-    // Game Interaction Buttons
-    if(modalLikeBtn) modalLikeBtn.onclick = () => {
-        const gameId = extractGameIdFromIframe();
-        if (gameId) updateGameStats(gameId, 'like');
-    };
-    if(modalDislikeBtn) modalDislikeBtn.onclick = () => {
-        const gameId = extractGameIdFromIframe();
-        if (gameId) updateGameStats(gameId, 'dislike');
-    };
-    if(modalFavoriteBtn) modalFavoriteBtn.onclick = () => {
-        const gameId = extractGameIdFromIframe();
-        if (gameId) toggleFavorite(gameId);
-    };
-    
-    // Game Card Click Handler (Event Delegation)
-    const pageContent = $("pageContent");
-    if(pageContent) pageContent.addEventListener('click', (e) => {
-        const card = e.target.closest('.game-card');
-        if (card) {
-            if (e.target.closest('.favorite-toggle-btn')) {
-                toggleFavorite(card.dataset.gameId);
-                return;
+    try {
+        // --- Modal Elements ---
+        const gameModal = $('gameModal');
+        const closeModalBtn = $('closeModalBtn');
+        const modalNoteBtn = $('modalNoteBtn');
+        const modalNoteSaveBtn = $('modalNoteSaveBtn');
+        const modalNoteText = $('modalNoteText');
+        const modalNoteArea = $('modalNoteArea');
+        const profileModal = $('profileModal');
+        const settingsModal = $('settingsModal');
+        
+        // --- Game Modal Event Handlers ---
+        closeModalBtn.onclick = closeGameModal;
+        modalNoteBtn.onclick = () => {
+            if (modalNoteArea) {
+                modalNoteArea.classList.toggle('hidden');
             }
-            if (e.target.closest('.tag-filter-btn')) {
-                customAlert(`Filtering by tag: ${e.target.dataset.tag} (Feature coming soon!)`, "Filter", "info");
-                return;
+        };
+        modalNoteSaveBtn.onclick = () => {
+            const gameId = currentModalGameId;
+            if (gameId && modalNoteText && modalNoteArea) {
+                const note = modalNoteText.value.trim();
+                if (note) {
+                    myGameNotes[gameId] = note;
+                    customAlert('Note saved!', "Saved", "success");
+                    updateModalStatsUI(gameId); // Update note button icon
+                } else {
+                    delete myGameNotes[gameId];
+                    customAlert('Note cleared.', "Cleared", "info");
+                    modalNoteArea.classList.add('hidden'); // Hide if cleared
+                    updateModalStatsUI(gameId); // Update note button icon
+                }
+                setStorageData('myGameNotes', myGameNotes);
             }
-            openGameModal(card.dataset.gameId);
+        };
+        
+        // Modal Action Buttons (Rating, Favorite, Play Count)
+        const modalFavoriteBtn = $('modalFavoriteBtn');
+        const modalLikeBtn = $('modalLikeBtn');
+        const modalDislikeBtn = $('modalDislikeBtn');
+
+        // These handlers now rely on the fix in updateModalStatsUI for initial state,
+        // but their event listeners must also use checks if the elements exist.
+        if (modalLikeBtn) {
+            modalLikeBtn.onclick = () => {
+                if (currentModalGameId) toggleGameRating(currentModalGameId, 'like');
+            };
+        }
+        if (modalDislikeBtn) {
+            modalDislikeBtn.onclick = () => {
+                if (currentModalGameId) toggleGameRating(currentModalGameId, 'dislike');
+            };
+        }
+        if (modalFavoriteBtn) {
+            modalFavoriteBtn.onclick = () => {
+                if (currentModalGameId) toggleFavorite(currentModalGameId);
+            };
+        }
+
+
+        // Global listener for opening the game modal from cards
+        const appContainer = $('appContainer');
+        if (appContainer) {
+            appContainer.addEventListener('click', (e) => {
+                let target = e.target;
+                while (target !== appContainer && target !== null) {
+                    if (target.classList.contains('game-card') && target.dataset.gameId) {
+                        openGameModal(target.dataset.gameId);
+                        break;
+                    }
+                    target = target.parentNode;
+                }
+            });
+        }
+
+        // --- Header and Controls ---
+        $('sortSelect').onchange = (e) => { currentGameSort = e.target.value; renderAll(); };
+        $('searchInput').oninput = (e) => { currentSearchQuery = e.target.value; renderAll(); };
+        $('panicBtn').onclick = toggleCloak;
+
+        // Panic Button (Q keypress)
+        document.addEventListener('keydown', (e) => {
+            // Check if user is typing in an input or textarea
+            const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+            if (e.key === 'q' && !isTyping) {
+                e.preventDefault();
+                toggleCloak();
+            }
+        });
+
+        // --- Profile Modal Logic ---
+        const profileBtn = $('profileBtn');
+        const userProfileSaveBtn = $('userProfileSaveBtn');
+        const userProfileCancelBtn = $('userProfileCancelBtn');
+        const userNicknameInput = $('userNicknameInput');
+        const userAvatarGrid = $('userAvatarGrid');
+        
+        function openProfileModal() {
+            if (!profileModal) return;
+            userNicknameInput.value = hubUser.nickname;
+            
+            // Render avatar grid
+            userAvatarGrid.innerHTML = AVATARS.map(avatar => 
+                `<button type="button" class="avatar-btn ${hubUser.avatar === avatar ? 'active' : ''}" data-avatar="${avatar}">
+                    ${avatar}
+                </button>`
+            ).join('');
+
+            // Add avatar selection handler
+            userAvatarGrid.querySelectorAll('.avatar-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    userAvatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                };
+            });
+
+            profileModal.classList.remove('opacity-0', 'pointer-events-none');
+            profileModal.querySelector('.transform').classList.remove('scale-95');
+        }
+
+        function closeProfileModal() {
+            if (!profileModal) return;
+            profileModal.classList.add('opacity-0', 'pointer-events-none');
+            profileModal.querySelector('.transform').classList.add('scale-95');
+        }
+
+        profileBtn.onclick = openProfileModal;
+        userProfileCancelBtn.onclick = closeProfileModal;
+        userProfileSaveBtn.onclick = () => {
+            const newNickname = userNicknameInput.value.trim();
+            const activeAvatarBtn = userAvatarGrid.querySelector('.avatar-btn.active');
+            const newAvatar = activeAvatarBtn ? activeAvatarBtn.dataset.avatar : hubUser.avatar;
+            
+            if (newNickname) {
+                hubUser.nickname = newNickname;
+                hubUser.avatar = newAvatar;
+                setStorageData('hubUser', hubUser);
+                customAlert('Profile saved!', "Success", "success");
+                renderNavigation(); // Update header avatar
+                closeProfileModal();
+            } else {
+                customAlert('Nickname cannot be empty.', "Error", "error");
+            }
+        };
+
+        // --- Settings/Admin Modal Logic ---
+        const settingsCloseBtn = $('settingsCloseBtn');
+        const settingsTabButtons = [$('tabGeneral'), $('tabAdmin')];
+        const settingsContentAreas = [$('contentGeneral'), $('contentAdmin')];
+        const themeRadios = [$('themeLight'), $('themeDark')];
+        const accentColorGrid = $('accentColorGrid');
+        const cloakTitleInput = $('cloakTitleInput');
+        const cloakFaviconInput = $('cloakFaviconInput');
+        const adminLoginBtn = $('adminLoginBtn');
+        const adminPassInput = $('adminPassInput');
+        const adminLoginArea = $('adminLoginArea');
+        const adminToolsArea = $('adminToolsArea');
+        const addGameForm = $('addGameForm');
+        const clearFormBtn = $('clearFormBtn');
+        const exportDataBtn = $('exportDataBtn');
+        const importDataBtn = $('importDataBtn');
+        const importFileInput = $('importFileInput');
+
+        function openSettingsModal() {
+            if (!settingsModal) return;
+            
+            // General Tab Setup
+            (settings.theme === 'dark' ? $('themeDark') : $('themeLight')).checked = true;
+            cloakTitleInput.value = settings.cloakTitle;
+            cloakFaviconInput.value = settings.cloakFavicon;
+            
+            // Accent Color Grid
+            accentColorGrid.innerHTML = Object.keys(ACCENT_COLORS).map(name => {
+                const color = ACCENT_COLORS[name].hex;
+                return `<button type="button" class="w-10 h-10 rounded-full border-4 ${settings.accent === name ? 'border-gray-900 dark:border-white' : 'border-transparent'}" style="background-color: ${color};" data-color-name="${name}" title="${name}"></button>`;
+            }).join('');
+
+            // Admin Tab Setup
+            // Restore last active tab (default to General)
+            settingsTabButtons.forEach(btn => {
+                const tabName = btn.id.replace('tab', 'content');
+                if (btn.classList.contains('border-accent')) {
+                    settingsContentAreas.forEach(area => area.classList.add('hidden'));
+                    $(tabName).classList.remove('hidden');
+                }
+            });
+
+            // Check admin status
+            if (sessionStorage.getItem('isAdmin') === 'true') {
+                adminLoginArea.classList.add('hidden');
+                adminToolsArea.classList.remove('hidden');
+            } else {
+                adminLoginArea.classList.remove('hidden');
+                adminToolsArea.classList.add('hidden');
+            }
+
+            settingsModal.classList.remove('opacity-0', 'pointer-events-none');
+            settingsModal.querySelector('.transform').classList.remove('scale-95');
+        }
+
+        function closeSettingsModal() {
+            if (!settingsModal) return;
+            settingsModal.classList.add('opacity-0', 'pointer-events-none');
+            settingsModal.querySelector('.transform').classList.add('scale-95');
         }
         
-        const tagBtn = e.target.closest('#tagsPageGrid .tag-filter-btn');
-        if(tagBtn) {
-             customAlert(`Filtering by tag: ${tagBtn.dataset.tag} (Feature coming soon!)`, "Filter", "info");
-        }
-    });
+        // Tab switching
+        settingsTabButtons.forEach(btn => {
+            btn.onclick = () => {
+                settingsTabButtons.forEach(b => {
+                    b.classList.remove('text-accent', 'border-accent');
+                    b.classList.add('text-gray-500', 'dark:text-gray-400');
+                });
+                settingsContentAreas.forEach(c => c.classList.add('hidden'));
 
-    // User Profile Modal
-    if(userProfileButton) userProfileButton.onclick = openUserProfileModal;
-    if(userProfileCancelBtn) userProfileCancelBtn.onclick = () => userProfileModal.classList.add('hidden');
-    // Save button is assigned inside renderAvatarGrid
+                btn.classList.add('text-accent', 'border-accent');
+                btn.classList.remove('text-gray-500', 'dark:text-gray-400');
+                
+                const targetId = btn.id.replace('tab', 'content');
+                $(targetId).classList.remove('hidden');
+            };
+        });
 
-    // Settings Modal
-    if(settingsButton) settingsButton.onclick = () => settingsModal.classList.remove('hidden');
-    if(settingsSaveBtn) settingsSaveBtn.onclick = () => {
-         if (hubDescriptionInput && settings.hubDescription !== hubDescriptionInput.value) {
-             settings.hubDescription = hubDescriptionInput.value.trim();
-             setStorageData('hubSettings', settings);
-             applySettings();
-         }
-         settingsModal.classList.add('hidden');
-    };
-    
-    // Safety Features
-    if(panicButton) panicButton.onclick = handlePanic;
-    if(saveCloakSettingsBtn) saveCloakSettingsBtn.onclick = saveCloakSettings;
-    document.body.onkeyup = (e) => {
-         if (e.key === 'f' || e.key === 'F') {
-             if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                 handlePanic();
-             }
-         }
-    };
+        $('settingsBtn').onclick = openSettingsModal;
+        settingsCloseBtn.onclick = closeSettingsModal;
 
-    // Admin: Login
-    if(adminLoginBtn) adminLoginBtn.onclick = handleAdminLogin;
-    if(adminPasswordInput) adminPasswordInput.addEventListener('keyup', (e) => {
-        if (e.key === 'Enter') handleAdminLogin();
-    });
+        // Theme and Accent changes
+        themeRadios.forEach(radio => {
+            radio.onchange = (e) => {
+                updateTheme(e.target.value);
+            };
+        });
+        accentColorGrid.onclick = (e) => {
+            let target = e.target;
+            while (target !== accentColorGrid && target !== null) {
+                if (target.dataset.colorName) {
+                    updateAccentColor(target.dataset.colorName);
+                    // Update borders
+                    accentColorGrid.querySelectorAll('button').forEach(btn => {
+                        btn.classList.remove('border-gray-900', 'dark:border-white');
+                        btn.classList.add('border-transparent');
+                    });
+                    target.classList.remove('border-transparent');
+                    target.classList.add('border-gray-900', 'dark:border-white');
+                    break;
+                }
+                target = target.parentNode;
+            }
+        };
 
-    // Admin: Game Management
-    if(saveGameBtn) saveGameBtn.onclick = saveGame;
-    if(clearFormBtn) clearFormBtn.onclick = clearAddForm;
-    
-    if(existingGamesList) existingGamesList.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('.admin-edit-btn');
-        const deleteBtn = e.target.closest('.admin-delete-btn');
+        // Cloaking settings save
+        cloakTitleInput.oninput = (e) => {
+            settings.cloakTitle = e.target.value.trim() || 'Google Docs';
+            setStorageData('hubSettings', settings);
+        };
+        cloakFaviconInput.oninput = (e) => {
+            settings.cloakFavicon = e.target.value.trim().slice(0, 1) || '📄';
+            setStorageData('hubSettings', settings);
+        };
         
-        if (editBtn) editGame(editBtn.dataset.gameId);
-        if (deleteBtn) deleteGame(deleteBtn.dataset.gameId);
-    });
+        // Admin Login
+        adminLoginBtn.onclick = () => {
+            if (adminPassInput.value === ADMIN_PASS) {
+                sessionStorage.setItem('isAdmin', 'true');
+                adminLoginArea.classList.add('hidden');
+                adminToolsArea.classList.remove('hidden');
+                customAlert('Admin access granted!', "Welcome", "success");
+            } else {
+                customAlert('Incorrect password.', "Access Denied", "error");
+            }
+            adminPassInput.value = '';
+        };
 
-    // Admin: Data
-    if(exportDataBtn) exportDataBtn.onclick = exportData;
-    if(importDataBtn) importDataBtn.onclick = () => importFileInput.click();
-    if(importFileInput) importFileInput.onchange = (e) => {
-        if (e.target.files.length > 0) {
-            importData(e.target.files[0]);
-        }
-    };
+        // Admin: Add/Edit Game
+        addGameForm.onsubmit = (e) => {
+            e.preventDefault();
+            try {
+                const id = $('gameIdInput').value;
+                const title = $('gameTitleInput').value.trim();
+                const url = $('gameUrlInput').value.trim();
+                const image = $('gameImageInput').value.trim() || `https://placehold.co/400x300/4f46e5/ffffff?text=${encodeURIComponent(title)}`;
+                const description = $('gameDescriptionInput').value.trim() || 'No description provided.';
+                const tags = ($('gameTagsInput').value.trim() || '').split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
+                const section = $('gameSectionSelect').value;
 
-    // --- MAIN INITIALIZATION CALL ---
-    // This starts the entire application
-    initialize();
+                const gameData = { title, url, image, description, tags, section };
+
+                if (id) {
+                    // Edit existing game
+                    allGames[id] = { ...allGames[id], ...gameData };
+                    customAlert(`Game "${title}" updated!`, "Success", "success");
+                } else {
+                    // Add new game
+                    const newId = `g_${new Date().getTime()}`;
+                    allGames[newId] = { id: newId, ...gameData, created: new Date().toISOString() };
+                    customAlert(`Game "${title}" added!`, "Success", "success");
+                }
+                
+                setStorageData('hubGames', allGames);
+                initialize(); // Re-initialize to update tags and re-render
+                clearAddForm();
+            } catch (error) {
+                console.error("Error saving game:", error);
+                customAlert(`Error saving game: ${error.message}`, "Error", "error");
+            }
+        };
+        clearFormBtn.onclick = clearAddForm;
+
+        // Admin: Data
+        exportDataBtn.onclick = exportData;
+        importDataBtn.onclick = () => importFileInput.click();
+        importFileInput.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                importData(e.target.files[0]);
+            }
+        };
+
+        // Run the main app initialization
+        initialize();
+        // Remove loading screen after successful initialization
+        $('loadingModal').classList.add('opacity-0');
+        setTimeout(() => {
+            $('loadingModal').classList.add('hidden');
+        }, 300);
+
+        console.log("App initialized successfully.");
+        
+    } catch (err) {
+        console.error("A fatal error occurred during initialization:", err);
+        // Show a user-friendly error message
+        $('loadingModal').innerHTML = `
+            <div class="p-4 bg-red-800 border-4 border-red-500 rounded-lg">
+                <h2 class="text-xl font-bold text-white">Error: Could not load the application.</h2>
+                <p class="mt-2 text-red-100">Check the console (F12) for details.</p>
+            </div>`;
+    }
 });
