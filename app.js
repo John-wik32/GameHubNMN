@@ -238,6 +238,7 @@ function initialize() {
     applyTheme(currentTheme, true);
     updateThemeToggleUI(); // Set the icon correctly on load
 
+    // *** THIS IS THE FIX: Changed 'renderUserProfile' to 'updateUserProfileUI' ***
     updateUserProfileUI();
 
     // Update "auth" status
@@ -843,8 +844,8 @@ function renderAvatarGrid() {
 
     userAvatarGrid.querySelectorAll('.avatar-btn').forEach(btn => {
         btn.onclick = () => {
-            userAvatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('avatar-selected'));
-            btn.classList.add('avatar-selected');
+            userAvatarGrid.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('active-avatar')); // Use a unique class
+            btn.classList.add('active-avatar');
             tempAvatar = btn.dataset.avatar;
         };
     });
@@ -1008,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // User Profile Modal
     if(userProfileButton) userProfileButton.onclick = openUserProfileModal;
-    if(userProfileCancelBtn) userProfileCancelBtn.onclick = () => userProfileModal.classList.add('hidden');
+    if(userProfileCancelBtn) userProfileCancelBtn.onclick = ()D => userProfileModal.classList.add('hidden');
     // Save button is assigned inside renderAvatarGrid
 
     // Settings Modal
