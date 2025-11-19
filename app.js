@@ -908,3 +908,29 @@ function checkForUpdates() {
         Utils.setStorageData('lastUpdateCheck', Date.now());
     }
 }
+// In app.js DOMContentLoaded:
+if (CONFIG.FEATURES.SWIPE_GESTURES) {
+    const script = document.createElement('script');
+    script.src = 'https://hammerjs.github.io/dist/hammer.min.js';
+    script.onload = () => {
+        document.querySelectorAll('.game-card').forEach(card => {
+            const hammer = new Hammer(card);
+            hammer.on('swipeleft', () => Actions.toggleFavorite(card.dataset.gameId));
+        });
+    };
+    document.head.appendChild(script);
+}
+// In app.js, add to admin tab:
+function renderAnalytics() {
+    const totalPlays = Object.values(State.data.stats.counts).reduce((a,b) => a+b, 0);
+    $('analyticsTotalPlays').textContent = Utils.formatNumber(totalPlays);
+    $('analyticsTotalGames').textContent = Object.keys(State.data.games).length;
+    
+    // Popular games list
+    const popular = Object.entries(State.data.stats.counts)
+        .sort((a,b) => b[1] - a[1])
+        .slice(0, 10);
+    $('popularGamesList').innerHTML = popular.map(([id, count]) => 
+        `<li>${State.data.games[id]?.title} - ${Utils.formatNumber(count)} plays</li>`
+    ).join('');
+}
