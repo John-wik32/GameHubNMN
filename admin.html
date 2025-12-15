@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Admin Panel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<h2>Admin Dashboard</h2>
+<form id="gameForm">
+<input placeholder="Title" id="title">
+<input placeholder="Logo URL" id="logo">
+<textarea placeholder="Embed or URL" id="embed"></textarea>
+<input placeholder="Tags (comma)" id="tags">
+<input placeholder="Tab" id="tab">
+<button>Add Game</button>
+</form>
+<button onclick="exportData()">Export JSON</button>
+<script src="js/store.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
