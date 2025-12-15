@@ -1,20 +1,38 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-<title>Admin Panel</title>
+<meta charset="UTF-8">
+<title>Admin</title>
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 <h2>Admin Dashboard</h2>
-<form id="gameForm">
-<input placeholder="Title" id="title">
-<input placeholder="Logo URL" id="logo">
-<textarea placeholder="Embed or URL" id="embed"></textarea>
-<input placeholder="Tags (comma)" id="tags">
-<input placeholder="Tab" id="tab">
-<button>Add Game</button>
-</form>
-<button onclick="exportData()">Export JSON</button>
+
+<section class="card">
+<h3>Add Game</h3>
+<input id="title" placeholder="Title">
+<input id="logo" placeholder="Logo URL">
+<textarea id="embed" placeholder="Embed code or game URL"></textarea>
+<input id="tags" placeholder="Tags (comma separated)">
+<input id="tab" placeholder="Tab (Popular, New, etc)">
+<button id="add">Add Game</button>
+</section>
+
+<section class="card">
+<h3>Theme Editor</h3>
+<input type="color" id="primary">
+<input type="color" id="bg">
+<button id="saveTheme">Save Theme</button>
+</section>
+
+<section class="card">
+<h3>Analytics</h3>
+<div id="stats"></div>
+</section>
+
+<button onclick="exportData()">Export games.json</button>
+
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
 </body>

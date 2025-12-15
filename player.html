@@ -1,12 +1,27 @@
+
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <title>Player</title>
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+<header>
+<button onclick="history.back()">⬅ Back</button>
+<h2 id="title"></h2>
+</header>
+
 <div id="player"></div>
-<button onclick="like()">Like</button>
+
+<div class="actions">
+<button id="like">❤️ Like</button>
+<button onclick="toggleFull()">⛶ Fullscreen</button>
+<button onclick="share()">🔗 Share</button>
+</div>
+
+<div id="comments"></div>
+
 <script src="js/store.js"></script>
 <script src="js/player.js"></script>
 </body>
