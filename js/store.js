@@ -1,14 +1,26 @@
+const KEY = "GAMEHUB_DATA";
 
-const KEY='GAMEHUB_DATA';
+const defaultData = {
+  password: "admin123",
+  theme: {
+    primary: "#7c5cff",
+    bg: "#0f111a",
+    card: "#181b29",
+    text: "#ffffff"
+  },
+  tabs: ["Popular", "New"],
+  games: []
+};
 
-function load(){
- return JSON.parse(localStorage.getItem(KEY)||'{"games":[],"theme":{}}');
+function load() {
+  return JSON.parse(localStorage.getItem(KEY)) || defaultData;
 }
 
-function save(data){
- localStorage.setItem(KEY,JSON.stringify(data));
+function save(data) {
+  localStorage.setItem(KEY, JSON.stringify(data));
 }
 
-function uid(){
- return Date.now().toString(36);
+function uid() {
+  return Math.random().toString(36).slice(2);
 }
+
