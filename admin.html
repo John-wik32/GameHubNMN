@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,23 +6,39 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+
+<div id="login">
+  <h2>Admin Login</h2>
+  <input id="pass" type="password" placeholder="Password">
+  <button onclick="login()">Enter</button>
+</div>
+
+<div id="panel" hidden>
+
 <h2>Admin Dashboard</h2>
 
 <section class="card">
 <h3>Add Game</h3>
 <input id="title" placeholder="Title">
-<input id="logo" placeholder="Logo URL">
-<textarea id="embed" placeholder="Embed code or game URL"></textarea>
-<input id="tags" placeholder="Tags (comma separated)">
-<input id="tab" placeholder="Tab (Popular, New, etc)">
-<button id="add">Add Game</button>
+<textarea id="embed" placeholder="Embed or URL"></textarea>
+<input id="tab" placeholder="Tab">
+<button onclick="addGame()">Add</button>
 </section>
 
 <section class="card">
-<h3>Theme Editor</h3>
+<h3>Tabs</h3>
+<input id="newTab" placeholder="New tab">
+<button onclick="addTab()">Add Tab</button>
+<ul id="tabList"></ul>
+</section>
+
+<section class="card">
+<h3>Theme</h3>
 <input type="color" id="primary">
 <input type="color" id="bg">
-<button id="saveTheme">Save Theme</button>
+<input type="color" id="card">
+<input type="color" id="text">
+<button onclick="saveTheme()">Save Theme</button>
 </section>
 
 <section class="card">
@@ -31,9 +46,10 @@
 <div id="stats"></div>
 </section>
 
-<button onclick="exportData()">Export games.json</button>
+</div>
 
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>
+
