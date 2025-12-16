@@ -3,13 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Play Game</title>
+    <title>Play Game - GameHub</title>
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G1SQKN0XHJ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-G1SQKN0XHJ');
+    </script>
+
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <header>
-    <button onclick="location.href='index.html'" class="secondary">⬅ Back to Hub</button>
+    <button onclick="location.href='index.html'" class="secondary">⬅ Back</button>
     <h2 id="gameTitle" style="margin:0; font-size:1.2rem;">Loading...</h2>
     <div></div>
 </header>
@@ -20,6 +29,7 @@
 
     <div class="actions">
         <button onclick="toggleLike()" id="likeBtn">❤️ Like (<span id="likeCount">0</span>)</button>
+        <button onclick="toggleFav()" id="favBtn" class="secondary">⭐ Favorite</button>
         <button onclick="shareGame()" class="secondary">🔗 Share</button>
         <button onclick="goFullscreen()" class="secondary">⛶ Fullscreen</button>
     </div>
@@ -27,6 +37,7 @@
     <div class="card" style="margin-top:20px;">
         <h3>Description</h3>
         <p id="gameDesc" style="color:#ccc;"></p>
+        <div id="gameTags" style="margin-top:10px;"></div>
     </div>
 
     <div class="card" style="margin-top:20px;">
