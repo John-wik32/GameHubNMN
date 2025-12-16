@@ -1,46 +1,79 @@
 const data = load();
-applyTheme();
+applyTheme(data.theme);
 
 const gamesEl = document.getElementById("games");
 const tabsEl = document.getElementById("tabs");
+let activeTab = "All";
 
-data.tabs.forEach(tab => {
-  const b = document.createElement("button");
-  b.textContent = tab;
-  b.onclick = () => render(tab);
-  tabsEl.appendChild(b);
-});
+// Render Tabs
+function initTabs() {
+    tabsEl.innerHTML = "";
+    
+    // Add 'All' tab manually if not present
+    const allTabs = ["All", ...data.tabs.filter(t => t !== "All")];
 
-function render(tab) {
-  gamesEl.innerHTML = "";
-  data.games.filter(g => g.tab === tab).forEach(g => {
-    const d = document.createElement("div");
-    d.className = "game";
-    d.innerHTML = `
-      <img src="${g.logo}">
-      <h3>${g.title}</h3>
-      <p>${g.description}</p>
-    `;
-    d.onclick = () => location.href = `player.html?id=${g.id}`;
-    gamesEl.appendChild(d);
-  });
+    allTabs.forEach(tab => {
+        const btn = document.createElement("button");
+        btn.textContent = tab;
+        if(tab !== activeTab) btn.classList.add("secondary");
+        
+        btn.onclick = () => {
+            activeTab = tab;
+            initTabs(); // Re-render tabs to update active class
+            renderGames();
+        };
+        tabsEl.appendChild(btn);
+    });
 }
 
-render(data.tabs[0]);
+// Render Games
+function renderGames(filterText = "") {
+    gamesEl.innerHTML = "";
+    
+    let filtered = data.games;
 
-function applyTheme() {
-  const t = data.theme;
-  document.documentElement.style.setProperty("--primary", t.primary);
-  document.documentElement.style.setProperty("--bg", t.bg);
-  document.documentElement.style.setProperty("--card", t.card);
-  document.documentElement.style.setProperty("--text", t.text);
+    // Filter by Tab
+    if (activeTab !== "All") {
+        filtered = filtered.filter(g => g.tab === activeTab);
+    }
+
+    // Filter by Search
+    if (filterText) {
+        filtered = filtered.filter(g => 
+            g.title.toLowerCase().includes(filterText.toLowerCase()) || 
+            g.tags.some(t => t.toLowerCase().includes(filterText.toLowerCase()))
+        );
+    }
+
+    if(filtered.length === 0) {
+        gamesEl.innerHTML = "<p style='grid-column:1/-1; text-align:center; color:gray;'>No games found.</p>";
+        return;
+    }
+
+    filtered.forEach(g => {
+        const card = document.createElement("div");
+        card.className = "game-card";
+        card.onclick = () => location.href = `player.html?id=${g.id}`;
+        
+        card.innerHTML = `
+            <img src="${g.logo}" alt="${g.title}" onerror="this.src='https://placehold.co/400x300?text=Game'">
+            <div class="game-info">
+                <h3>${g.title}</h3>
+                <p>${g.views} views • ${g.likes} likes</p>
+                <div style="margin-top:8px;">
+                    ${g.tags.map(t => `<span class="badge">${t}</span>`).join(" ")}
+                </div>
+            </div>
+        `;
+        gamesEl.appendChild(card);
+    });
 }
 
-function openAdmin() {
-  const pass = prompt("Admin password:");
-  if (pass === data.password) {
-    window.open("admin.html", "_blank");
-  } else {
-    alert("Wrong password");
-  }
+function searchGames() {
+    const text = document.getElementById("searchBar").value;
+    renderGames(text);
 }
+
+// Init
+initTabs();
+renderGames();
