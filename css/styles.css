@@ -14,7 +14,8 @@ body{
 
 header{
  display:flex;
- justify-content:space-between;
+ gap:12px;
+ align-items:center;
  padding:16px;
 }
 
@@ -29,7 +30,7 @@ button{
 
 #games{
  display:grid;
- grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+ grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
  gap:16px;
  padding:16px;
 }
@@ -46,33 +47,21 @@ button{
  transform:scale(1.06) rotateX(6deg);
 }
 
+.game img{
+ width:100%;
+ border-radius:12px;
+}
+
+.card{
+ background:var(--card);
+ padding:16px;
+ border-radius:16px;
+ margin:16px 0;
+}
+
 iframe{
  width:100%;
  height:70vh;
  border:none;
  border-radius:16px;
-}
-
-/* Admin */
-#adminBtn{
- position:fixed;
- bottom:20px;
- right:20px;
- z-index:9999;
-}
-
-#adminOverlay{
- position:fixed;
- inset:0;
- background:rgba(0,0,0,.6);
- backdrop-filter:blur(8px);
- z-index:9998;
-}
-
-.admin-panel{
- background:var(--card);
- max-width:500px;
- margin:5vh auto;
- padding:20px;
- border-radius:20px;
 }
