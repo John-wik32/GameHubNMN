@@ -27,23 +27,23 @@ button{
  cursor:pointer;
 }
 
+#games{
+ display:grid;
+ grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+ gap:16px;
+ padding:16px;
+}
+
 .game{
  background:var(--card);
  padding:16px;
- margin:12px;
  border-radius:18px;
+ cursor:pointer;
  transition:.4s;
  transform-style:preserve-3d;
 }
 .game:hover{
  transform:scale(1.06) rotateX(6deg);
-}
-
-.card{
- background:var(--card);
- padding:16px;
- border-radius:16px;
- margin:16px 0;
 }
 
 iframe{
@@ -53,3 +53,26 @@ iframe{
  border-radius:16px;
 }
 
+/* Admin */
+#adminBtn{
+ position:fixed;
+ bottom:20px;
+ right:20px;
+ z-index:9999;
+}
+
+#adminOverlay{
+ position:fixed;
+ inset:0;
+ background:rgba(0,0,0,.6);
+ backdrop-filter:blur(8px);
+ z-index:9998;
+}
+
+.admin-panel{
+ background:var(--card);
+ max-width:500px;
+ margin:5vh auto;
+ padding:20px;
+ border-radius:20px;
+}
