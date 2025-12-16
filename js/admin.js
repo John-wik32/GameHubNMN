@@ -1,39 +1,13 @@
 const data = load();
 
-function login() {
-  if (pass.value === data.password) {
-    login.style.display = "none";
-    panel.hidden = false;
-    renderAdmin();
-  } else alert("Wrong password");
-}
-
-function renderAdmin() {
-  stats.innerHTML =
-    "Games: " + data.games.length + "<br>" +
-    "Views: " + data.games.reduce((a,g)=>a+g.views,0);
-
-  tabList.innerHTML = "";
-  data.tabs.forEach((t,i)=>{
-    const li=document.createElement("li");
-    li.textContent=t;
-    li.draggable=true;
-    li.ondragstart=e=>e.dataTransfer.setData("i",i);
-    li.ondrop=e=>{
-      const from=e.dataTransfer.getData("i");
-      data.tabs.splice(i,0,data.tabs.splice(from,1)[0]);
-      save(data); renderAdmin();
-    };
-    li.ondragover=e=>e.preventDefault();
-    tabList.appendChild(li);
-  });
-}
-
 function addGame() {
   data.games.push({
     id: uid(),
     title: title.value,
+    logo: logo.value,
+    description: description.value,
     embed: embed.value,
+    tags: tags.value.split(","),
     tab: tab.value,
     likes: 0,
     views: 0,
@@ -46,7 +20,16 @@ function addGame() {
 function addTab() {
   data.tabs.push(newTab.value);
   save(data);
-  renderAdmin();
+  renderTabs();
+}
+
+function renderTabs() {
+  tabList.innerHTML = "";
+  data.tabs.forEach(t => {
+    const li = document.createElement("li");
+    li.textContent = t;
+    tabList.appendChild(li);
+  });
 }
 
 function saveTheme() {
@@ -60,3 +43,9 @@ function saveTheme() {
   alert("Theme saved");
 }
 
+stats.innerHTML = `
+Games: ${data.games.length}<br>
+Views: ${data.games.reduce((a,g)=>a+g.views,0)}
+`;
+
+renderTabs();
