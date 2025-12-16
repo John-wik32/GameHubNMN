@@ -1,17 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>GameHub</title>
-<link rel="stylesheet" href="css/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameHub</title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <header>
-  <h1>🎮 GameHub</h1>
-  <nav id="tabs"></nav>
-  <button onclick="openAdmin()">⚙ Admin</button>
+    <h1>🎮 GameHub</h1>
+    <div style="flex-grow:1; max-width:400px; margin:0 20px;">
+        <input type="text" id="searchBar" placeholder="Search games..." onkeyup="searchGames()">
+    </div>
+    <button onclick="location.href='admin.html'" class="secondary">⚙ Admin</button>
 </header>
+
+<div style="padding: 24px 24px 0 24px;">
+    <nav id="tabs"></nav>
+</div>
 
 <main id="games"></main>
 
