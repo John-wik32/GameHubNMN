@@ -3,10 +3,9 @@ const id = new URLSearchParams(location.search).get("id");
 const game = data.games.find(g => g.id === id);
 
 title.textContent = game.title;
-player.innerHTML =
-  game.embed.includes("<")
-    ? game.embed
-    : `<iframe src="${game.embed}" allowfullscreen></iframe>`;
+player.innerHTML = game.embed.includes("<")
+  ? game.embed
+  : `<iframe src="${game.embed}" allowfullscreen></iframe>`;
 
 game.views++;
 save(data);
@@ -14,7 +13,6 @@ save(data);
 function like() {
   game.likes++;
   save(data);
-  alert("Liked");
 }
 
 function comment() {
@@ -30,6 +28,16 @@ function renderComments() {
     d.textContent = c;
     comments.appendChild(d);
   });
+}
+
+function share() {
+  navigator.share
+    ? navigator.share({ url: location.href })
+    : alert(location.href);
+}
+
+function fullscreen() {
+  document.getElementById("player").requestFullscreen();
 }
 
 renderComments();
