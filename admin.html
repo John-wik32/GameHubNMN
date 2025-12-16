@@ -2,27 +2,22 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Admin</title>
+<title>Admin Panel</title>
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
-<div id="login">
-  <h2>Admin Login</h2>
-  <input id="pass" type="password" placeholder="Password">
-  <button onclick="login()">Enter</button>
-</div>
-
-<div id="panel" hidden>
 
 <h2>Admin Dashboard</h2>
 
 <section class="card">
 <h3>Add Game</h3>
 <input id="title" placeholder="Title">
-<textarea id="embed" placeholder="Embed or URL"></textarea>
+<input id="logo" placeholder="Logo URL">
+<textarea id="description" placeholder="Description"></textarea>
+<textarea id="embed" placeholder="Embed code OR URL"></textarea>
+<input id="tags" placeholder="Tags (comma separated)">
 <input id="tab" placeholder="Tab">
-<button onclick="addGame()">Add</button>
+<button onclick="addGame()">Add Game</button>
 </section>
 
 <section class="card">
@@ -46,10 +41,7 @@
 <div id="stats"></div>
 </section>
 
-</div>
-
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>
-
