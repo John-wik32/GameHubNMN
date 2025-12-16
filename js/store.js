@@ -13,7 +13,7 @@ const defaultData = {
 };
 
 function load() {
-  return JSON.parse(localStorage.getItem(KEY)) || defaultData;
+  return JSON.parse(localStorage.getItem(KEY)) || structuredClone(defaultData);
 }
 
 function save(data) {
@@ -23,4 +23,3 @@ function save(data) {
 function uid() {
   return Math.random().toString(36).slice(2);
 }
-
