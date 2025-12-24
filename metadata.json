@@ -1,0 +1,10 @@
+
+{
+  "name": "CodeNexus V7",
+  "description": "Adaptive, real-world engineering simulation and career accelerator.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
